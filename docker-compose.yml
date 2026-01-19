@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: knowledgetree-db
+    environment:
+      POSTGRES_USER: knowledgetree
+      POSTGRES_PASSWORD: knowledgetree_secret
+      POSTGRES_DB: knowledgetree
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledgetree -d knowledgetree"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - knowledgetree-network
+
+  # Redis (for caching and job queue)
+  redis:
+    image: redis:7-alpine
+    container_name: knowledgetree-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - knowledgetree-network
+
+  # FastAPI Backend with BGE-M3
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: knowledgetree-backend
+    environment:
+      # Database
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=knowledgetree
+      - DB_PASSWORD=knowledgetree_secret
+      - DB_NAME=knowledgetree
+      - DATABASE_URL=postgresql+asyncpg://knowledgetree:knowledgetree_secret@db:5432/knowledgetree
+
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # BGE-M3 Embeddings
+      - EMBEDDING_MODEL=BAAI/bge-m3
+      - EMBEDDING_DIMENSIONS=1024
+      - EMBEDDING_DEVICE=cpu
+      - HF_HOME=/app/models
+
+      # PDF Processing
+      - CHUNK_SIZE=1000
+      - CHUNK_OVERLAP=200
+      - MAX_FILE_SIZE_MB=50
+
+      # Security
+      - SECRET_KEY=dev_secret_key_change_in_production
+      - ACCESS_TOKEN_EXPIRE_MINUTES=15
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+
+      # CORS
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+      # API Keys (set in .env file)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      - GOOGLE_CSE_API_KEY=${GOOGLE_CSE_API_KEY:-}
+
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+      - bge_models:/app/models
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - knowledgetree-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React Frontend (Vite)
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: knowledgetree-frontend
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_APP_NAME=KnowledgeTree
+      - VITE_APP_VERSION=0.1.0
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - knowledgetree-network
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  bge_models:
+    driver: local
+
+networks:
+  knowledgetree-network:
+    driver: bridge
