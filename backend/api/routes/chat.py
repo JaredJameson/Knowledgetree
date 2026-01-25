@@ -27,7 +27,7 @@ from schemas.conversation import (
     ConversationUpdateRequest,
     MessageRole,
 )
-from api.dependencies import get_current_active_user
+from api.dependencies import get_current_active_user, check_messages_limit
 from services.rag_service import RAGService
 from services.command_parser import command_parser
 from services.artifact_generator import artifact_generator
@@ -51,16 +51,19 @@ anthropic_client = Anthropic()
 async def chat(
     request: ChatRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _messages_limit: None = Depends(check_messages_limit())
 ):
     """
     Send a message and get an AI response using RAG
 
     This endpoint:
-    1. Retrieves relevant document chunks using vector search (if use_rag=True)
-    2. Builds context from retrieved chunks and conversation history
-    3. Generates response using Claude API
-    4. Saves both user message and assistant response to database
+    1. Checks subscription message limits before processing
+    2. Retrieves relevant document chunks using vector search (if use_rag=True)
+    3. Builds context from retrieved chunks and conversation history
+    4. Generates response using Claude API
+    5. Saves both user message and assistant response to database
+    6. Tracks message usage for billing and limits
 
     **Request Body:**
     - `message`: User message (1-5000 chars)

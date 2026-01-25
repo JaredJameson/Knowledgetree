@@ -26,10 +26,11 @@ from schemas.category import (
     GenerateTreeResponse,
     CategoryResponse,
 )
-from api.dependencies import get_current_active_user
+from api.dependencies import get_current_active_user, check_documents_limit, check_storage_limit
 from services.pdf_processor import PDFProcessor
 from services.text_chunker import TextChunker
 from services.embedding_generator import EmbeddingGenerator
+from services.usage_service import usage_service
 from services.category_tree_generator import generate_category_tree
 from models.chunk import Chunk
 from models.category import Category
@@ -49,14 +50,18 @@ async def upload_document(
     project_id: int = Form(...),
     category_id: int = Form(None),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _documents_limit: None = Depends(check_documents_limit()),
+    _storage_limit: None = Depends(check_storage_limit())
 ):
     """
     Upload a document (PDF) for processing
 
+    - Checks subscription limits (documents count and storage space)
     - Validates file type and size
     - Saves file to disk
     - Creates database record
+    - Tracks usage for billing and limits
     - Queues for text extraction and embedding generation
     """
     # Validate file type
@@ -119,7 +124,26 @@ async def upload_document(
         document.file_path = str(file_path)
         await db.commit()
 
-        logger.info(f"Document uploaded: {document.id} - {document.filename}")
+        # Track usage for documents and storage
+        await usage_service.increment_usage(
+            db=db,
+            user_id=current_user.id,
+            metric="documents_uploaded",
+            period="monthly",
+            amount=1
+        )
+
+        # Track storage usage (convert bytes to GB)
+        storage_gb = file_size / (1024 * 1024 * 1024)
+        await usage_service.increment_usage(
+            db=db,
+            user_id=current_user.id,
+            metric="storage_gb",
+            period="monthly",
+            amount=int(storage_gb) if storage_gb >= 1 else 1  # Minimum 1 GB per document
+        )
+
+        logger.info(f"Document uploaded: {document.id} - {document.filename}, size: {file_size} bytes ({storage_gb:.2f} GB)")
 
         return DocumentUploadResponse(
             id=document.id,

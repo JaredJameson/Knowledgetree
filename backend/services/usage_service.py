@@ -18,12 +18,33 @@ logger = logging.getLogger(__name__)
 class UsageService:
     """Service for tracking and managing user usage"""
 
-    # Usage limits per plan (messages per month)
+    # Usage limits per plan - structured by metric type
+    # All limits are per month except storage (cumulative)
     PLAN_LIMITS = {
-        "free": 50,
-        "starter": 500,
-        "professional": 2000,
-        "enterprise": None,  # Unlimited
+        "messages_sent": {
+            "free": 50,
+            "starter": 1000,
+            "professional": 5000,
+            "enterprise": 20000,
+        },
+        "storage_gb": {
+            "free": 1,
+            "starter": 10,
+            "professional": 100,
+            "enterprise": 1000,  # 1 TB
+        },
+        "documents_uploaded": {
+            "free": 100,
+            "starter": 1000,
+            "professional": 10000,
+            "enterprise": None,  # unlimited
+        },
+        "projects": {
+            "free": 3,
+            "starter": 10,
+            "professional": None,  # unlimited
+            "enterprise": None,  # unlimited
+        },
     }
 
     @staticmethod
@@ -124,13 +145,22 @@ class UsageService:
         """
         Check if user is within usage limits
 
+        Args:
+            db: Database session
+            user_id: User ID
+            metric: Metric to check (messages_sent, documents_uploaded, storage_gb, projects)
+            plan: Subscription plan (free, starter, professional, enterprise)
+
         Returns:
             (allowed, current_usage, limit)
             - allowed: Whether the action is allowed
             - current_usage: Current usage count
             - limit: Usage limit (None for unlimited)
         """
-        limit = UsageService.PLAN_LIMITS.get(plan)
+        # Get limit for this metric and plan
+        metric_limits = UsageService.PLAN_LIMITS.get(metric, {})
+        limit = metric_limits.get(plan)
+
         current_usage = await UsageService.get_usage(db, user_id, metric, "monthly")
 
         if limit is None:

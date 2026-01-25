@@ -47,11 +47,11 @@ async def get_my_subscription(
         plan = SubscriptionPlan.ENTERPRISE
         plan_details = PLAN_DETAILS.get(plan, {}).copy()
 
-        # Override with unlimited values
+        # Override with enterprise plan values (DEMO_MODE)
         plan_details.update({
             "documents_limit": None,  # Unlimited
-            "messages_limit": None,  # Unlimited
-            "storage_gb": 10000,  # Effectively unlimited
+            "messages_limit": 20000,  # 20K messages/month
+            "storage_gb": 500,  # 500 GB (not 10000 - that was a bug!)
             "projects_limit": None,  # Unlimited
         })
 
