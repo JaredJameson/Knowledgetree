@@ -1,0 +1,165 @@
+{
+  "app": {
+    "name": "KnowledgeTree",
+    "description": "AI-powered knowledge repository and RAG platform"
+  },
+  "common": {
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "close": "Close",
+    "submit": "Submit",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "language": "Language"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in to KnowledgeTree",
+      "subtitle": "Enter your credentials to access your account",
+      "emailPlaceholder": "your@email.com",
+      "passwordPlaceholder": "Your password",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "Don't have an account?",
+      "signUpLink": "Sign up"
+    },
+    "register": {
+      "title": "Create Account",
+      "subtitle": "Start your journey with KnowledgeTree",
+      "fullNamePlaceholder": "Full Name",
+      "emailPlaceholder": "your@email.com",
+      "passwordPlaceholder": "Strong password",
+      "hasAccount": "Already have an account?",
+      "signInLink": "Sign in"
+    },
+    "logout": {
+      "title": "Are you sure you want to sign out?",
+      "confirm": "Sign Out",
+      "cancel": "Cancel"
+    }
+  },
+  "designSystem": {
+    "title": "Design System",
+    "typography": {
+      "title": "Typography",
+      "description": "Inter font family with semantic type scale",
+      "displayLarge": "Display Large",
+      "display": "Display",
+      "headingLarge": "Heading Large",
+      "heading": "Heading",
+      "body": "Body text (base size)",
+      "caption": "Small text for captions"
+    },
+    "colors": {
+      "title": "Color Palette",
+      "description": "Pastel colors with semantic tokens",
+      "primary": "Primary",
+      "success": "Success",
+      "warning": "Warning",
+      "error": "Error"
+    },
+    "buttons": {
+      "title": "Buttons",
+      "description": "Button variants with proper states",
+      "default": "Default",
+      "secondary": "Secondary",
+      "outline": "Outline",
+      "ghost": "Ghost",
+      "link": "Link",
+      "destructive": "Destructive",
+      "small": "Small",
+      "large": "Large",
+      "disabled": "Disabled"
+    },
+    "forms": {
+      "title": "Form Inputs",
+      "description": "Text inputs with focus states",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "submitButton": "Sign In"
+    },
+    "status": {
+      "success": "Design system successfully configured!",
+      "details": "TailwindCSS 3.4 + shadcn/ui + Inter font + Dark mode support"
+    }
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "toggleTheme": "Toggle theme",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode"
+  },
+  "dashboard": {
+    "welcome": "Welcome",
+    "subtitle": "Manage your knowledge base with AI and RAG system",
+    "stats": {
+      "projects": "Projects",
+      "documents": "Documents",
+      "conversations": "Conversations",
+      "loading": "Loading...",
+      "noProjects": "No projects",
+      "oneProject": "1 project",
+      "manyProjects": "{{count}} projects",
+      "noDocuments": "No documents",
+      "oneDocument": "1 document",
+      "manyDocuments": "{{count}} documents",
+      "noConversations": "No conversations",
+      "oneConversation": "1 conversation",
+      "manyConversations": "{{count}} conversations"
+    },
+    "gettingStarted": {
+      "title": "Getting Started",
+      "description": "Quick access to main features",
+      "goButton": "Go",
+      "projects": {
+        "title": "Project Management",
+        "description": "Create and manage knowledge projects"
+      },
+      "documents": {
+        "title": "Document Upload",
+        "description": "Upload PDF files and documents"
+      },
+      "search": {
+        "title": "Semantic Search",
+        "description": "Search your knowledge base"
+      },
+      "chat": {
+        "title": "RAG Chat",
+        "description": "Chat with AI about your documents"
+      }
+    }
+  },
+  "documents": {
+    "actions": {
+      "process": "Process",
+      "reprocess": "Reprocess",
+      "generateTree": "Generate Categories"
+    },
+    "generateTree": {
+      "generating": "Generating...",
+      "error": "Failed to generate category tree",
+      "successTitle": "Categories Generated Successfully",
+      "errorTitle": "Generation Failed",
+      "viewInCategories": "View the generated categories in the Categories section of your project.",
+      "stats": {
+        "created": "Categories Created:",
+        "maxDepth": "Max Depth:",
+        "skipped": "Skipped (too deep):"
+      }
+    }
+  }
+}

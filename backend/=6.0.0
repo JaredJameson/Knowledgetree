@@ -1,0 +1,30 @@
+Collecting youtube-transcript-api
+  Downloading youtube_transcript_api-1.2.3-py3-none-any.whl.metadata (24 kB)
+Collecting pytubefix
+  Downloading pytubefix-10.3.6-py3-none-any.whl.metadata (9.2 kB)
+Collecting defusedxml<0.8.0,>=0.7.1 (from youtube-transcript-api)
+  Downloading defusedxml-0.7.1-py2.py3-none-any.whl.metadata (32 kB)
+Requirement already satisfied: requests in /home/jarek/miniconda3/lib/python3.13/site-packages (from youtube-transcript-api) (2.32.5)
+Requirement already satisfied: aiohttp>=3.12.13 in /home/jarek/miniconda3/lib/python3.13/site-packages (from pytubefix) (3.12.15)
+Collecting nodejs-wheel-binaries>=22.20.0 (from pytubefix)
+  Downloading nodejs_wheel_binaries-24.13.0-py2.py3-none-manylinux_2_28_x86_64.whl.metadata (4.6 kB)
+Requirement already satisfied: aiohappyeyeballs>=2.5.0 in /home/jarek/miniconda3/lib/python3.13/site-packages (from aiohttp>=3.12.13->pytubefix) (2.6.1)
+Requirement already satisfied: aiosignal>=1.4.0 in /home/jarek/miniconda3/lib/python3.13/site-packages (from aiohttp>=3.12.13->pytubefix) (1.4.0)
+Requirement already satisfied: attrs>=17.3.0 in /home/jarek/miniconda3/lib/python3.13/site-packages (from aiohttp>=3.12.13->pytubefix) (25.3.0)
+Requirement already satisfied: frozenlist>=1.1.1 in /home/jarek/miniconda3/lib/python3.13/site-packages (from aiohttp>=3.12.13->pytubefix) (1.7.0)
+Requirement already satisfied: multidict<7.0,>=4.5 in /home/jarek/miniconda3/lib/python3.13/site-packages (from aiohttp>=3.12.13->pytubefix) (6.6.4)
+Requirement already satisfied: propcache>=0.2.0 in /home/jarek/miniconda3/lib/python3.13/site-packages (from aiohttp>=3.12.13->pytubefix) (0.3.2)
+Requirement already satisfied: yarl<2.0,>=1.17.0 in /home/jarek/miniconda3/lib/python3.13/site-packages (from aiohttp>=3.12.13->pytubefix) (1.20.1)
+Requirement already satisfied: idna>=2.0 in /home/jarek/miniconda3/lib/python3.13/site-packages (from yarl<2.0,>=1.17.0->aiohttp>=3.12.13->pytubefix) (2.10)
+Requirement already satisfied: charset_normalizer<4,>=2 in /home/jarek/miniconda3/lib/python3.13/site-packages (from requests->youtube-transcript-api) (3.3.2)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /home/jarek/miniconda3/lib/python3.13/site-packages (from requests->youtube-transcript-api) (2.5.0)
+Requirement already satisfied: certifi>=2017.4.17 in /home/jarek/miniconda3/lib/python3.13/site-packages (from requests->youtube-transcript-api) (2025.11.12)
+Downloading youtube_transcript_api-1.2.3-py3-none-any.whl (485 kB)
+Downloading defusedxml-0.7.1-py2.py3-none-any.whl (25 kB)
+Downloading pytubefix-10.3.6-py3-none-any.whl (1.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.5/1.5 MB 1.7 MB/s eta 0:00:00
+Downloading nodejs_wheel_binaries-24.13.0-py2.py3-none-manylinux_2_28_x86_64.whl (60.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.2/60.2 MB 3.5 MB/s eta 0:00:00
+Installing collected packages: nodejs-wheel-binaries, defusedxml, youtube-transcript-api, pytubefix
+
+Successfully installed defusedxml-0.7.1 nodejs-wheel-binaries-24.13.0 pytubefix-10.3.6 youtube-transcript-api-1.2.3

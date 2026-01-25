@@ -88,7 +88,7 @@ export default {
       },
       // Typography - Inter font family
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       // Font sizes (type scale)
       fontSize: {

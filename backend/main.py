@@ -8,9 +8,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from core.config import settings
+from core.database import AsyncSessionLocal
 
-# Import routers (will be added in later sprints)
-# from api.routes import auth, projects, categories, documents, search, chat
+# Import routers
+from api.routes import auth_router, documents_router, categories_router, projects_router, search_router, chat_router, export_router, artifacts_router, usage_router, crawl_router, workflows_router
+from api.routes.insights import router as insights_router
+from api.routes.subscriptions import router as subscriptions_router
+from api.routes.api_keys import router as api_keys_router
+from api.routes.youtube import router as youtube_router
+
+# Import services for initialization
+from services.bm25_service import bm25_service
+from services.cross_encoder_service import cross_encoder_service
 
 
 @asynccontextmanager
@@ -22,6 +31,25 @@ async def lifespan(app: FastAPI):
     print("🚀 KnowledgeTree backend starting up...")
     print(f"📦 Environment: {settings.ENVIRONMENT}")
     print(f"🔧 Debug mode: {settings.DEBUG}")
+
+    # Initialize BM25 index for sparse retrieval (TIER 1 Advanced RAG - Phase 1)
+    try:
+        print("🔄 Initializing BM25 sparse retrieval index...")
+        async with AsyncSessionLocal() as db:
+            await bm25_service.initialize(db)
+        print("✅ BM25 index initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize BM25 index: {e}")
+        print("   Sparse retrieval will not be available")
+
+    # Initialize Cross-Encoder for reranking (TIER 1 Advanced RAG - Phase 3)
+    try:
+        print("🔄 Initializing Cross-Encoder reranking model...")
+        cross_encoder_service.initialize()
+        print("✅ Cross-Encoder initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize Cross-Encoder: {e}")
+        print("   Reranking will not be available")
 
     yield
 
@@ -76,13 +104,22 @@ async def root():
     }
 
 
-# Include routers (will be uncommented in later sprints)
-# app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-# app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
-# app.include_router(categories.router, prefix="/api/categories", tags=["Categories"])
-# app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
-# app.include_router(search.router, prefix="/api/search", tags=["Search"])
-# app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+# Include routers
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(projects_router, prefix="/api/v1")
+app.include_router(documents_router, prefix="/api/v1")
+app.include_router(categories_router, prefix="/api/v1")
+app.include_router(search_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
+app.include_router(export_router, prefix="/api/v1")
+app.include_router(artifacts_router, prefix="/api/v1")
+app.include_router(usage_router, prefix="/api/v1")
+app.include_router(crawl_router, prefix="/api/v1")
+app.include_router(workflows_router, prefix="/api/v1")
+app.include_router(insights_router, prefix="/api/v1")
+app.include_router(subscriptions_router, prefix="/api/v1")
+app.include_router(api_keys_router, prefix="/api/v1")
+app.include_router(youtube_router, prefix="/api/v1")
 
 
 if __name__ == "__main__":

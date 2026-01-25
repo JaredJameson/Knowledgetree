@@ -22,6 +22,8 @@ alembic>=1.13.0
 # ============================================================================
 PyMuPDF>=1.23.0
 docling>=2.0.0
+pypdf>=4.0.0  # For ToC/outline extraction
+pdfplumber>=0.11.0  # For table extraction backup
 
 # ============================================================================
 # BGE-M3 Embeddings (Local Model - No API Calls)
@@ -29,12 +31,14 @@ docling>=2.0.0
 FlagEmbedding>=1.2.0
 torch>=2.0.0
 sentence-transformers>=2.2.0
+rank-bm25>=0.2.2
 
 # ============================================================================
 # Configuration & Validation
 # ============================================================================
 pydantic>=2.6.0
 pydantic-settings>=2.1.0
+pydantic[email]>=2.6.0
 python-dotenv>=1.0.0
 
 # ============================================================================
@@ -42,7 +46,7 @@ python-dotenv>=1.0.0
 # ============================================================================
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
-bcrypt>=4.1.2
+bcrypt>=3.2.2,<4.0.0
 
 # ============================================================================
 # AI Services - Claude API
@@ -50,9 +54,58 @@ bcrypt>=4.1.2
 anthropic>=0.18.0
 
 # ============================================================================
+# AI Services - OpenAI API (Primary LLM - GPT-4o-mini)
+# ============================================================================
+openai>=1.0.0
+
+# ============================================================================
+# LangGraph & LangChain - Agent Orchestration
+# ============================================================================
+langgraph>=0.0.20
+langchain>=0.1.0
+langchain-anthropic>=0.1.0
+
+# ============================================================================
+# Google Search API - URL Discovery
+# ============================================================================
+google-api-python-client>=2.100.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.0.0
+
+# ============================================================================
+# Additional Utilities for Agent Workflows
+# ============================================================================
+msgpack>=1.0.0  # Alternative serialization for checkpointing
+prometheus-client>=0.19.0  # Metrics monitoring
+structlog>=23.2.0  # Structured logging
+
+# ============================================================================
+# Payment Processing - Stripe
+# ============================================================================
+stripe>=10.0.0
+
+# ============================================================================
 # Web Crawling (Sprint 6+)
 # ============================================================================
-# firecrawl-py>=0.0.5  # Uncomment when needed
+# HTTP Scraper (primary - fast, free)
+httpx>=0.26.0
+beautifulsoup4>=4.12.0
+lxml>=5.1.0
+
+# Playwright (JavaScript-heavy sites)
+playwright>=1.48.0
+
+# Firecrawl (difficult sites - optional, paid API)
+# Uncomment if you want to use Firecrawl:
+# firecrawl-py>=0.0.5
+
+# ============================================================================
+# YouTube Transcription (Video Content Extraction)
+# ============================================================================
+# YouTube transcript extraction (free, no API key needed)
+youtube-transcript-api>=0.6.0
+# Alternative/fallback for YouTube
+pytubefix>=6.0.0
 
 # ============================================================================
 # Utilities

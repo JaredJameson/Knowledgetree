@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: knowledgetree_secret
       POSTGRES_DB: knowledgetree
     ports:
-      - "5432:5432"
+      - "5437:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
@@ -27,7 +27,7 @@ services:
     image: redis:7-alpine
     container_name: knowledgetree-redis
     ports:
-      - "6379:6379"
+      - "6381:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -74,15 +74,27 @@ services:
       - REFRESH_TOKEN_EXPIRE_DAYS=7
 
       # CORS
-      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+      - CORS_ORIGINS=http://localhost:3555,http://localhost:5173,http://localhost:3000
 
       # API Keys (set in .env file)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      - SERPER_API_KEY=${SERPER_API_KEY:-}
       - GOOGLE_CSE_API_KEY=${GOOGLE_CSE_API_KEY:-}
 
+      # Demo Mode
+      - DEMO_MODE=${DEMO_MODE:-false}
+
+      # Stripe (set in .env file)
+      - STRIPE_API_KEY=${STRIPE_API_KEY:-}
+      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - FRONTEND_URL=http://localhost:3555
+
     ports:
-      - "8000:8000"
+      - "8765:8000"
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
@@ -102,13 +114,15 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
+      target: development
     container_name: knowledgetree-frontend
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://localhost:8765
       - VITE_APP_NAME=KnowledgeTree
       - VITE_APP_VERSION=0.1.0
+      - VITE_DEMO_MODE=${VITE_DEMO_MODE:-false}
     ports:
-      - "5173:5173"
+      - "3555:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules

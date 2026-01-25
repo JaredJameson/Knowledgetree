@@ -1,7 +1,7 @@
 /* KnowledgeTree - Global Styles */
 
-/* Import Inter font from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* System fonts stack - similar to Inter, no external dependencies */
+/* Works offline without internet connection */
 
 /* Tailwind CSS base styles */
 @tailwind base;
@@ -33,7 +33,7 @@
   }
 
   * {
-    @apply border-border;
+    @apply border-neutral-200 dark:border-neutral-800;
   }
 
   body {

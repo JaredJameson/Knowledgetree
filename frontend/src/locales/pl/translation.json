@@ -1,0 +1,601 @@
+{
+  "app": {
+    "name": "KnowledgeTree",
+    "description": "Platforma wiedzy z AI i system RAG"
+  },
+  "common": {
+    "email": "E-mail",
+    "password": "Hasło",
+    "signIn": "Zaloguj się",
+    "signUp": "Zarejestruj się",
+    "signOut": "Wyloguj",
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usuń",
+    "edit": "Edytuj",
+    "create": "Utwórz",
+    "search": "Szukaj",
+    "loading": "Ładowanie...",
+    "error": "Błąd",
+    "success": "Sukces",
+    "close": "Zamknij",
+    "submit": "Wyślij",
+    "back": "Wróć",
+    "next": "Dalej",
+    "previous": "Poprzedni",
+    "language": "Język"
+  },
+  "auth": {
+    "login": {
+      "title": "Zaloguj się",
+      "subtitle": "Platforma wiedzy z AI",
+      "description": "Wprowadź swoje dane aby się zalogować",
+      "email": "E-mail",
+      "password": "Hasło",
+      "emailPlaceholder": "twoj@email.com",
+      "passwordPlaceholder": "Twoje hasło",
+      "submit": "Zaloguj się",
+      "loggingIn": "Logowanie...",
+      "forgotPassword": "Zapomniałeś hasła?",
+      "noAccount": "Nie masz konta?",
+      "registerLink": "Zarejestruj się"
+    },
+    "register": {
+      "title": "Utwórz konto",
+      "subtitle": "Rozpocznij swoją przygodę z KnowledgeTree",
+      "description": "Wypełnij formularz aby utworzyć konto",
+      "fullName": "Imię i nazwisko",
+      "fullNamePlaceholder": "Jan Kowalski",
+      "email": "E-mail",
+      "password": "Hasło",
+      "emailPlaceholder": "twoj@email.com",
+      "passwordPlaceholder": "Silne hasło",
+      "passwordHint": "Minimum 8 znaków",
+      "submit": "Zarejestruj się",
+      "registering": "Rejestracja...",
+      "hasAccount": "Masz już konto?",
+      "loginLink": "Zaloguj się"
+    },
+    "logout": {
+      "title": "Czy na pewno chcesz się wylogować?",
+      "confirm": "Wyloguj",
+      "cancel": "Anuluj"
+    },
+    "footer": "© 2026 KnowledgeTree. Wszystkie prawa zastrzeżone."
+  },
+  "designSystem": {
+    "title": "System Projektowy",
+    "typography": {
+      "title": "Typografia",
+      "description": "Rodzina czcionek Inter z semantyczną skalą typograficzną",
+      "displayLarge": "Wyświetlacz Duży",
+      "display": "Wyświetlacz",
+      "headingLarge": "Nagłówek Duży",
+      "heading": "Nagłówek",
+      "body": "Tekst podstawowy",
+      "caption": "Mały tekst dla podpisów"
+    },
+    "colors": {
+      "title": "Paleta Kolorów",
+      "description": "Pastelowe kolory z semantycznymi tokenami",
+      "primary": "Podstawowy",
+      "success": "Sukces",
+      "warning": "Ostrzeżenie",
+      "error": "Błąd"
+    },
+    "buttons": {
+      "title": "Przyciski",
+      "description": "Warianty przycisków z odpowiednimi stanami",
+      "default": "Domyślny",
+      "secondary": "Drugorzędny",
+      "outline": "Kontur",
+      "ghost": "Przeźroczysty",
+      "link": "Link",
+      "destructive": "Destrukcyjny",
+      "small": "Mały",
+      "large": "Duży",
+      "disabled": "Wyłączony"
+    },
+    "forms": {
+      "title": "Pola Formularza",
+      "description": "Pola tekstowe ze stanami fokusa",
+      "emailLabel": "E-mail",
+      "passwordLabel": "Hasło",
+      "submitButton": "Zaloguj się"
+    },
+    "status": {
+      "success": "System projektowy skonfigurowany pomyślnie!",
+      "details": "TailwindCSS 3.4 + shadcn/ui + Czcionka Inter + Tryb ciemny"
+    }
+  },
+  "theme": {
+    "light": "Jasny",
+    "dark": "Ciemny",
+    "system": "Systemowy",
+    "toggleTheme": "Przełącz motyw",
+    "switchToLight": "Przełącz na tryb jasny",
+    "switchToDark": "Przełącz na tryb ciemny"
+  },
+  "dashboard": {
+    "welcome": "Witaj",
+    "subtitle": "Zarządzaj swoją bazą wiedzy z AI i systemem RAG",
+    "stats": {
+      "projects": "Projekty",
+      "documents": "Dokumenty",
+      "conversations": "Rozmowy",
+      "loading": "Ładowanie...",
+      "noProjects": "Brak projektów",
+      "oneProject": "1 projekt",
+      "manyProjects": "{{count}} projektów",
+      "noDocuments": "Brak dokumentów",
+      "oneDocument": "1 dokument",
+      "manyDocuments": "{{count}} dokumentów",
+      "noConversations": "Brak rozmów",
+      "oneConversation": "1 rozmowa",
+      "manyConversations": "{{count}} rozmów"
+    },
+    "gettingStarted": {
+      "title": "Rozpocznij pracę",
+      "description": "Szybki dostęp do głównych funkcji",
+      "goButton": "Przejdź",
+      "projects": {
+        "title": "Zarządzanie projektami",
+        "description": "Twórz i zarządzaj projektami wiedzy"
+      },
+      "documents": {
+        "title": "Upload dokumentów",
+        "description": "Prześlij pliki PDF i dokumenty"
+      },
+      "search": {
+        "title": "Wyszukiwanie semantyczne",
+        "description": "Szukaj w swojej bazie wiedzy"
+      },
+      "chat": {
+        "title": "Czat RAG",
+        "description": "Rozmawiaj z AI o swoich dokumentach"
+      }
+    }
+  },
+  "projects": {
+    "title": "Projekty",
+    "description": "Zarządzaj swoimi projektami wiedzy",
+    "createNew": "Nowy projekt",
+    "noProjects": "Brak projektów",
+    "noProjectsDescription": "Utwórz swój pierwszy projekt, aby rozpocząć",
+    "viewDocuments": "Zobacz dokumenty",
+    "viewDetails": "Zobacz szczegóły",
+    "create": {
+      "title": "Utwórz nowy projekt",
+      "description": "Dodaj nowy projekt do swojej bazy wiedzy",
+      "nameLabel": "Nazwa projektu",
+      "namePlaceholder": "Mój projekt wiedzy",
+      "descriptionLabel": "Opis (opcjonalnie)",
+      "descriptionPlaceholder": "Krótki opis projektu...",
+      "submit": "Utwórz projekt",
+      "creating": "Tworzenie...",
+      "success": "Projekt utworzony pomyślnie",
+      "error": "Nie udało się utworzyć projektu"
+    },
+    "edit": {
+      "title": "Edytuj projekt",
+      "description": "Zaktualizuj informacje o projekcie",
+      "submit": "Zapisz zmiany",
+      "updating": "Aktualizacja...",
+      "success": "Projekt zaktualizowany pomyślnie",
+      "error": "Nie udało się zaktualizować projektu"
+    },
+    "delete": {
+      "title": "Usuń projekt",
+      "description": "Czy na pewno chcesz usunąć ten projekt?",
+      "warning": "Ta akcja jest nieodwracalna. Wszystkie dokumenty i dane zostaną usunięte.",
+      "confirm": "Tak, usuń projekt",
+      "cancel": "Anuluj",
+      "deleting": "Usuwanie...",
+      "success": "Projekt usunięty pomyślnie",
+      "error": "Nie udało się usunąć projektu"
+    },
+    "stats": {
+      "documents": "Dokumenty",
+      "conversations": "Rozmowy",
+      "lastUpdated": "Ostatnia aktualizacja",
+      "createdAt": "Utworzono"
+    }
+  },
+  "documents": {
+    "title": "Dokumenty",
+    "description": "Zarządzaj dokumentami w projekcie",
+    "backToProjects": "Powrót do projektów",
+    "selectProject": "Wybierz projekt",
+    "noProjectSelected": "Nie wybrano projektu",
+    "noProjectSelectedDescription": "Wybierz projekt, aby zobaczyć jego dokumenty",
+    "uploadNew": "Prześlij dokument",
+    "noDocuments": "Brak dokumentów",
+    "noDocumentsDescription": "Prześlij swój pierwszy dokument PDF, aby rozpocząć",
+    "upload": {
+      "title": "Prześlij dokument",
+      "description": "Dodaj pliki PDF do swojego projektu",
+      "dropzone": "Przeciągnij plik PDF tutaj lub kliknij, aby wybrać",
+      "dropzoneActive": "Upuść plik tutaj...",
+      "maxSize": "Maksymalny rozmiar: 50MB",
+      "acceptedFormats": "Akceptowane formaty: PDF",
+      "uploading": "Przesyłanie...",
+      "success": "Dokument przesłany pomyślnie",
+      "error": "Nie udało się przesłać dokumentu",
+      "invalidFile": "Nieprawidłowy plik. Wybierz plik PDF.",
+      "fileTooLarge": "Plik jest zbyt duży. Maksymalny rozmiar to 50MB."
+    },
+    "process": {
+      "title": "Przetwarzanie dokumentu",
+      "description": "Wyodrębnij tekst, podziel na fragmenty i wygeneruj embeddingi",
+      "start": "Rozpocznij przetwarzanie",
+      "processing": "Przetwarzanie...",
+      "success": "Dokument przetworzony pomyślnie",
+      "error": "Nie udało się przetworzyć dokumentu"
+    },
+    "status": {
+      "pending": "Oczekuje",
+      "processing": "Przetwarzanie",
+      "completed": "Ukończono",
+      "failed": "Błąd"
+    },
+    "stats": {
+      "pages": "Strony",
+      "chunks": "Fragmenty",
+      "embeddings": "Embeddingi",
+      "fileSize": "Rozmiar pliku",
+      "uploadedAt": "Przesłano",
+      "processedAt": "Przetworzono"
+    },
+    "actions": {
+      "view": "Zobacz",
+      "process": "Przetwórz",
+      "reprocess": "Przetwórz ponownie",
+      "download": "Pobierz",
+      "delete": "Usuń",
+      "generateTree": "Generuj Kategorie"
+    },
+    "generateTree": {
+      "generating": "Generowanie...",
+      "error": "Nie udało się wygenerować drzewa kategorii",
+      "successTitle": "Kategorie Wygenerowane Pomyślnie",
+      "errorTitle": "Generowanie Nieudane",
+      "viewInCategories": "Zobacz wygenerowane kategorie w sekcji Kategorie swojego projektu.",
+      "stats": {
+        "created": "Utworzono Kategorii:",
+        "maxDepth": "Maksymalna Głębokość:",
+        "skipped": "Pominięto (zbyt głębokie):"
+      }
+    },
+    "delete": {
+      "title": "Usuń dokument",
+      "description": "Czy na pewno chcesz usunąć ten dokument?",
+      "warning": "Ta akcja jest nieodwracalna. Wszystkie fragmenty i embeddingi zostaną usunięte.",
+      "confirm": "Tak, usuń dokument",
+      "cancel": "Anuluj",
+      "deleting": "Usuwanie...",
+      "success": "Dokument usunięty pomyślnie",
+      "error": "Nie udało się usunąć dokumentu"
+    }
+  },
+  "search": {
+    "title": "Wyszukiwanie",
+    "description": "Przeszukaj swoją bazę wiedzy semantycznie",
+    "selectProject": "Wybierz projekt",
+    "noProjectSelected": "Nie wybrano projektu",
+    "noProjectSelectedDescription": "Wybierz projekt, aby wyszukiwać w jego dokumentach",
+    "searchPlaceholder": "Wpisz zapytanie...",
+    "searchButton": "Szukaj",
+    "searching": "Wyszukiwanie...",
+    "noResults": "Brak wyników",
+    "noResultsDescription": "Nie znaleziono dokumentów pasujących do Twojego zapytania",
+    "resultsCount": "Znaleziono {{count}} wyników",
+    "resultsCountSingular": "Znaleziono 1 wynik",
+    "searchTime": "Czas wyszukiwania: {{time}}s",
+    "filters": {
+      "title": "Filtry",
+      "minSimilarity": "Minimalne podobieństwo",
+      "minSimilarityDescription": "Wyniki poniżej tego progu zostaną ukryte",
+      "maxResults": "Maksymalna liczba wyników",
+      "maxResultsDescription": "Ogranicz liczbę zwracanych wyników"
+    },
+    "result": {
+      "similarity": "Podobieństwo",
+      "document": "Dokument",
+      "chunk": "Fragment",
+      "viewDocument": "Zobacz dokument",
+      "excerpt": "Fragment tekstu"
+    },
+    "stats": {
+      "title": "Statystyki wyszukiwania",
+      "totalDocuments": "Dokumenty w projekcie",
+      "totalChunks": "Fragmenty do przeszukania",
+      "averageChunkLength": "Średnia długość fragmentu",
+      "totalEmbeddings": "Embeddingi",
+      "loading": "Ładowanie statystyk..."
+    },
+    "errors": {
+      "searchFailed": "Nie udało się wykonać wyszukiwania",
+      "noQuery": "Wprowadź zapytanie",
+      "noProject": "Wybierz projekt"
+    }
+  },
+  "chat": {
+    "title": "Czat RAG",
+    "description": "Rozmawiaj z AI o swoich dokumentach",
+    "selectProject": "Wybierz projekt",
+    "noProjectSelected": "Nie wybrano projektu",
+    "noProjectSelectedDescription": "Wybierz projekt, aby rozpocząć rozmowę",
+    "newConversation": "Nowa rozmowa",
+    "conversations": "Rozmowy",
+    "noConversations": "Brak rozmów",
+    "noConversationsDescription": "Rozpocznij swoją pierwszą rozmowę z AI",
+    "inputPlaceholder": "Napisz wiadomość...",
+    "send": "Wyślij",
+    "sending": "Wysyłanie...",
+    "ragEnabled": "RAG włączony",
+    "ragDisabled": "RAG wyłączony",
+    "ragDescription": "Używaj kontekstu z dokumentów",
+    "maxContextChunks": "Maksymalna liczba fragmentów kontekstu",
+    "messages": {
+      "user": "Ty",
+      "assistant": "AI Assistant",
+      "thinking": "AI myśli...",
+      "error": "Błąd podczas generowania odpowiedzi",
+      "empty": "Rozpocznij rozmowę, aby zobaczyć wiadomości"
+    },
+    "sources": {
+      "title": "Źródła",
+      "used": "Wykorzystane źródła ({{count}})",
+      "similarity": "Podobieństwo",
+      "document": "Dokument",
+      "chunk": "Fragment",
+      "viewDocument": "Zobacz dokument"
+    },
+    "actions": {
+      "copy": "Kopiuj",
+      "copied": "Skopiowano!",
+      "regenerate": "Regeneruj",
+      "delete": "Usuń"
+    },
+    "conversation": {
+      "rename": "Zmień nazwę",
+      "delete": "Usuń rozmowę",
+      "deleteConfirm": "Czy na pewno chcesz usunąć tę rozmowę?",
+      "deleteWarning": "Ta akcja jest nieodwracalna. Wszystkie wiadomości zostaną usunięte.",
+      "defaultTitle": "Nowa rozmowa",
+      "titlePlaceholder": "Wpisz tytuł...",
+      "saving": "Zapisywanie...",
+      "deleting": "Usuwanie..."
+    },
+    "settings": {
+      "title": "Ustawienia czatu",
+      "useRag": "Użyj RAG (kontekst z dokumentów)",
+      "contextChunks": "Fragmenty kontekstu (1-10)",
+      "contextChunksDescription": "Liczba fragmentów dokumentów używanych jako kontekst"
+    },
+    "errors": {
+      "sendFailed": "Nie udało się wysłać wiadomości",
+      "loadFailed": "Nie udało się załadować rozmów",
+      "deleteFailed": "Nie udało się usunąć rozmowy",
+      "noMessage": "Wpisz wiadomość",
+      "noProject": "Wybierz projekt"
+    }
+  },
+  "billing": {
+    "title": "Rozliczenia i Subskrypcja",
+    "subtitle": "Zarządzaj swoją subskrypcją i metodami płatności",
+    "currentPlan": "Aktualny plan",
+    "status": "Status",
+    "active": "Aktywny",
+    "cancelled": "Anulowany",
+    "trial": "Okres próbny",
+    "pastDue": "Zaległy",
+    "documents": "Dokumenty",
+    "storage": "Pamięć",
+    "messages": "Wiadomości",
+    "managePayment": "Zarządzaj płatnością",
+    "cancelSubscription": "Anuluj subskrypcję",
+    "choosePlan": "Wybierz swój plan",
+    "choosePlanSubtitle": "Wybierz plan dopasowany do Twoich potrzeb",
+    "mostPopular": "Najpopularniejszy",
+    "selectPlan": "Wybierz plan",
+    "featureComparison": "Porównanie funkcji",
+    "checkoutSuccess": "Płatność zakończona pomyślnie! Twoja subskrypcja jest teraz aktywna.",
+    "checkoutCanceled": "Płatność anulowana. Możesz wybrać plan gdy będziesz gotowy.",
+    "confirmCancel": "Czy na pewno chcesz anulować subskrypcję?",
+    "unlimited": "Bez limitu",
+    "perMonth": "/miesiąc",
+    "demoMode": {
+      "title": "Wersja Demonstracyjna",
+      "description": "Pełny dostęp do wszystkich funkcji bez ograniczeń",
+      "badge": "DEMO",
+      "unlimitedAccess": "Nieograniczony dostęp",
+      "allFeatures": "Wszystkie funkcje dostępne",
+      "noSubscriptionNeeded": "Subskrypcja nie jest wymagana"
+    }
+  },
+  "subscription": {
+    "plans": {
+      "free": "Darmowy",
+      "starter": "Starter",
+      "professional": "Professional",
+      "enterprise": "Enterprise"
+    },
+    "intervals": {
+      "monthly": "miesięcznie",
+      "yearly": "rocznie"
+    },
+    "features": {
+      "projects": "Projekty",
+      "messages": "Wiadomości",
+      "storage": "Pamięć",
+      "documents": "Dokumenty",
+      "aiChat": "Czat z AI",
+      "ragSearch": "Wyszukiwanie RAG",
+      "advancedSearch": "Zaawansowane wyszukiwanie",
+      "export": "Eksport danych",
+      "apiAccess": "Dostęp API",
+      "support": "Wsparcie",
+      "prioritySupport": "Wsparcie priorytetowe",
+      "customIntegrations": "Integracje niestandardowe",
+      "sla": "SLA",
+      "dedicatedManager": "Dedykowany opiekun"
+    },
+    "limits": {
+      "projects": "Projekty",
+      "messagesPerMonth": "Wiadomości/miesiąc",
+      "storage": "Pamięć",
+      "documents": "Dokumenty"
+    }
+  },
+  "pricing": {
+    "title": "Wybierz swój plan",
+    "subtitle": "Wybierz idealny plan do zarządzania wiedzą. Wszystkie plany zawierają podstawowe funkcje.",
+    "mostPopular": "NAJPOPULARNIEJSZY",
+    "getStarted": "Rozpocznij",
+    "subscribe": "Subskrybuj",
+    "current": "Aktualny",
+    "perMonth": "/miesiąc",
+    "unlimited": "Bez limitu",
+    "features": {
+      "unlimitedMessages": "Nieograniczone wiadomości",
+      "storage": "GB pamięci",
+      "unlimitedDocuments": "Nieograniczone dokumenty",
+      "documents": "dokumentów"
+    },
+    "faq": {
+      "title": "Często zadawane pytania",
+      "changePlan": {
+        "question": "Czy mogę zmienić plan później?",
+        "answer": "Tak! Możesz zmienić plan w dowolnym momencie z poziomu panelu. Zmiany są stosowane natychmiast."
+      },
+      "freeTrial": {
+        "question": "Czy jest dostępna wersja próbna?",
+        "answer": "Wszystkie płatne plany zawierają 7-dniowy okres próbny. Możesz przetestować wszystkie funkcje przed podjęciem decyzji."
+      },
+      "paymentMethods": {
+        "question": "Jakie metody płatności akceptujecie?",
+        "answer": "Akceptujemy wszystkie główne karty kredytowe包括 Visa, Mastercard i American Express przez nasze bezpieczną integrację Stripe."
+      },
+      "cancelAnytime": {
+        "question": "Czy mogę anulować w dowolnym momencie?",
+        "answer": "Oczywiście! Możesz anulować subskrypcję w dowolnym momencie. Będziesz mieć dostęp do końca okresu rozliczeniowego."
+      }
+    },
+    "contact": {
+      "needCustom": "Potrzebujesz niestandardowego rozwiązania dla zespołu?",
+      "contactSales": "Kontakt z sprzedażą"
+    }
+  },
+  "crawl": {
+    "title": "Web Crawling",
+    "description": "Pobieraj treści ze stron internetowych do bazy wiedzy",
+    "configuration": "Konfiguracja",
+    "configurationDescription": "Wybierz projekt i kategorię dla pobranych treści",
+    "project": "Projekt",
+    "selectProject": "Wybierz projekt",
+    "category": "Kategoria (opcjonalne)",
+    "noCategory": "Bez kategorii",
+    "options": "Opcje",
+    "extractLinks": "Eksktrahuj linki",
+    "extractImages": "Eksktrahuj obrazy",
+    "saveToDb": "Zapisz do bazy",
+    "tabs": {
+      "single": "Pojedynczy URL",
+      "batch": "Batch Crawling"
+    },
+    "single": {
+      "title": "Pobranie pojedynczej strony",
+      "description": "Wprowadź URL strony do pobrania. System automatycznie wybierze odpowiedni silnik.",
+      "urlLabel": "URL",
+      "urlPlaceholder": "https://example.com",
+      "engineLabel": "Silnik (opcjonalne)",
+      "fetching": "Pobieranie...",
+      "fetch": "Pobierz",
+      "engines": {
+        "auto": {
+          "label": "Auto",
+          "description": "Automatyczny wybór (zalecane)"
+        },
+        "http": {
+          "label": "HTTP",
+          "description": "Szybki scraper dla statycznych stron (80% stron)"
+        },
+        "playwright": {
+          "label": "Playwright",
+          "description": "Przeglądarka dla JS-heavy stron (15% stron)"
+        },
+        "firecrawl": {
+          "label": "Firecrawl",
+          "description": "API dla trudnych stron z anti-bot (5% stron)"
+        }
+      },
+      "results": {
+        "success": "Sukces",
+        "error": "Błąd",
+        "title": "Tytuł",
+        "engine": "Silnik",
+        "textLength": "Długość tekstu",
+        "characters": "znaków",
+        "status": "Status",
+        "preview": "Podgląd (pierwsze 500 znaków)",
+        "copyText": "Kopiuj tekst",
+        "openUrl": "Otwórz URL",
+        "copied": "Skopiowano",
+        "copiedDescription": "Tekst skopiowany do schowka"
+      }
+    },
+    "batch": {
+      "title": "Batch Crawling",
+      "description": "Wprowadź wiele URLi (jeden na linię) do przetworzenia w tle.",
+      "urlsLabel": "Lista URLi (jeden na linię)",
+      "urlsPlaceholder": "https://example.com/page1\nhttps://example.com/page2\nhttps://example.com/page3",
+      "urlsCount": "/ 50 URLi",
+      "engineLabel": "Silnik",
+      "concurrencyLabel": "Równoległość",
+      "start": "Uruchom Batch Crawling",
+      "starting": "Uruchamianie...",
+      "jobStatus": {
+        "pending": "Oczekujący",
+        "processing": "Przetwarzanie",
+        "completed": "Ukończono",
+        "partial": "Częściowo",
+        "failed": "Błąd"
+      },
+      "progress": {
+        "completed": "ukończonych",
+        "of": "/",
+        "percent": "%",
+        "completedCount": "Ukończone",
+        "failedCount": "Błędy",
+        "totalCount": "Razem",
+        "newBatch": "Nowy batch",
+        "viewDocuments": "Zobacz pobrane dokumenty"
+      }
+    },
+    "info": {
+      "title": "Silniki crawlowania:",
+      "http": "Szybki dla statycznych stron HTML (~80% stron)",
+      "playwright": "Przeglądarka dla React/Vue/Angular (~15% stron)",
+      "firecrawl": "API dla stron z anti-bot, CAPTCHA (~5% stron)",
+      "firecrawlNote": "Firecrawl wymaga klucza API. Zarejestruj się na",
+      "firecrawlLink": "firecrawl.dev"
+    },
+    "errors": {
+      "noUrl": "Wprowadź URL do crawlowania",
+      "noProject": "Wybierz projekt do którego zapisać wyniki",
+      "noUrls": "Wprowadź przynajmniej jeden URL",
+      "tooManyUrls": "Maksymalnie 50 URLi jednocześnie",
+      "fetchFailed": "Nie udało się przeprowadzić crawlowania",
+      "batchStartFailed": "Nie udało się uruchomić crawlowania",
+      "loadProjectsFailed": "Nie udało się załadować projektów"
+    },
+    "success": {
+      "fetched": "Pobrano",
+      "withLength": "znaków",
+      "jobStarted": "Uruchomiono",
+      "jobId": "Job ID",
+      "urlsToProcess": "URLi do przetworzenia"
+    }
+  }
+}
