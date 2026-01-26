@@ -335,72 +335,51 @@ export default function WorkflowsPage() {
                   onValueChange={(value: any) => setTaskType(value)}
                   disabled={starting}
                 >
-                  <SelectTrigger className="h-auto py-3">
-                    <SelectValue>
-                      <div className="flex items-center gap-2">
-                        {taskType === 'research' && (
-                          <>
-                            <Target className="h-4 w-4" />
-                            <span className="font-medium">Badawczy</span>
-                          </>
-                        )}
-                        {taskType === 'scraping' && (
-                          <>
-                            <Globe className="h-4 w-4" />
-                            <span className="font-medium">Web Scraping</span>
-                          </>
-                        )}
-                        {taskType === 'analysis' && (
-                          <>
-                            <Brain className="h-4 w-4" />
-                            <span className="font-medium">Analityczny</span>
-                          </>
-                        )}
-                      </div>
-                    </SelectValue>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Wybierz typ zadania" />
                   </SelectTrigger>
                   <SelectContent className="z-50">
-                    <SelectItem value="research" className="py-3">
+                    <SelectItem value="research">
                       <div className="flex items-center gap-2">
                         <Target className="h-4 w-4 flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Badawczy</p>
-                          <p className="text-xs text-neutral-500">
-                            Głęboka analiza tematu z wieloma źródłami
-                          </p>
-                        </div>
+                        <span>Badawczy</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="scraping" className="py-3">
+                    <SelectItem value="scraping">
                       <div className="flex items-center gap-2">
                         <Globe className="h-4 w-4 flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Web Scraping</p>
-                          <p className="text-xs text-neutral-500">
-                            Crawling URLi i ekstrakcja danych
-                          </p>
-                        </div>
+                        <span>Web Scraping</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="analysis" className="py-3">
+                    <SelectItem value="analysis">
                       <div className="flex items-center gap-2">
                         <Brain className="h-4 w-4 flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Analityczny</p>
-                          <p className="text-xs text-neutral-500">
-                            Analiza danych i generowanie wniosków
-                          </p>
-                        </div>
+                        <span>Analityczny</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
                 {/* Selected type description */}
-                <p className="text-xs text-neutral-500 pl-1">
-                  {taskType === 'research' && '→ Głęboka analiza tematu z wieloma źródłami'}
-                  {taskType === 'scraping' && '→ Crawling URLi i ekstrakcja danych'}
-                  {taskType === 'analysis' && '→ Analiza danych i generowanie wniosków'}
-                </p>
+                <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800 rounded-md px-3 py-2">
+                  {taskType === 'research' && (
+                    <>
+                      <Target className="h-3.5 w-3.5 text-primary-500 flex-shrink-0" />
+                      <span>Głęboka analiza tematu z wieloma źródłami</span>
+                    </>
+                  )}
+                  {taskType === 'scraping' && (
+                    <>
+                      <Globe className="h-3.5 w-3.5 text-primary-500 flex-shrink-0" />
+                      <span>Crawling URLi i ekstrakcja danych</span>
+                    </>
+                  )}
+                  {taskType === 'analysis' && (
+                    <>
+                      <Brain className="h-3.5 w-3.5 text-primary-500 flex-shrink-0" />
+                      <span>Analiza danych i generowanie wniosków</span>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* User query */}
