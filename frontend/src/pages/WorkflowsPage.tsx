@@ -328,20 +328,41 @@ export default function WorkflowsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Task type */}
-              <div>
-                <label className="text-sm font-medium mb-2 block">Typ zadania</label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Typ zadania</label>
                 <Select
                   value={taskType}
                   onValueChange={(value: any) => setTaskType(value)}
                   disabled={starting}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="research">
+                  <SelectTrigger className="h-auto py-3">
+                    <SelectValue>
                       <div className="flex items-center gap-2">
-                        <Target className="h-4 w-4" />
+                        {taskType === 'research' && (
+                          <>
+                            <Target className="h-4 w-4" />
+                            <span className="font-medium">Badawczy</span>
+                          </>
+                        )}
+                        {taskType === 'scraping' && (
+                          <>
+                            <Globe className="h-4 w-4" />
+                            <span className="font-medium">Web Scraping</span>
+                          </>
+                        )}
+                        {taskType === 'analysis' && (
+                          <>
+                            <Brain className="h-4 w-4" />
+                            <span className="font-medium">Analityczny</span>
+                          </>
+                        )}
+                      </div>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="z-50">
+                    <SelectItem value="research" className="py-3">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-4 w-4 flex-shrink-0" />
                         <div>
                           <p className="font-medium">Badawczy</p>
                           <p className="text-xs text-neutral-500">
@@ -350,9 +371,9 @@ export default function WorkflowsPage() {
                         </div>
                       </div>
                     </SelectItem>
-                    <SelectItem value="scraping">
+                    <SelectItem value="scraping" className="py-3">
                       <div className="flex items-center gap-2">
-                        <Globe className="h-4 w-4" />
+                        <Globe className="h-4 w-4 flex-shrink-0" />
                         <div>
                           <p className="font-medium">Web Scraping</p>
                           <p className="text-xs text-neutral-500">
@@ -361,9 +382,9 @@ export default function WorkflowsPage() {
                         </div>
                       </div>
                     </SelectItem>
-                    <SelectItem value="analysis">
+                    <SelectItem value="analysis" className="py-3">
                       <div className="flex items-center gap-2">
-                        <Brain className="h-4 w-4" />
+                        <Brain className="h-4 w-4 flex-shrink-0" />
                         <div>
                           <p className="font-medium">Analityczny</p>
                           <p className="text-xs text-neutral-500">
@@ -374,6 +395,12 @@ export default function WorkflowsPage() {
                     </SelectItem>
                   </SelectContent>
                 </Select>
+                {/* Selected type description */}
+                <p className="text-xs text-neutral-500 pl-1">
+                  {taskType === 'research' && '→ Głęboka analiza tematu z wieloma źródłami'}
+                  {taskType === 'scraping' && '→ Crawling URLi i ekstrakcja danych'}
+                  {taskType === 'analysis' && '→ Analiza danych i generowanie wniosków'}
+                </p>
               </div>
 
               {/* User query */}
@@ -449,6 +476,9 @@ export default function WorkflowsPage() {
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </CardTitle>
+              <CardDescription>
+                Kliknij workflow aby zobaczyć szczegóły po prawej →
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
