@@ -24,6 +24,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { LanguageSwitcher } from './language-switcher';
 import { ThemeToggle } from './theme-toggle';
+import { useTheme } from './theme-provider';
 
 interface SidebarProps {
   className?: string;
@@ -33,6 +34,7 @@ export function Sidebar({ className }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
   const signOut = useSignOut();
+  const { theme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
 
   const navigation = [
@@ -61,13 +63,24 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Header */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-neutral-200 dark:border-neutral-800">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">KT</span>
-            </div>
-            <span className="font-semibold text-neutral-900 dark:text-neutral-50">
+          <div className="flex items-center gap-3">
+            <img
+              src={theme === 'dark' ? '/logo_biale.png' : '/logo_czarne.png'}
+              alt="KnowledgeTree Logo"
+              className="h-10 w-auto object-contain"
+            />
+            <span className="font-semibold text-lg text-neutral-900 dark:text-neutral-50">
               KnowledgeTree
             </span>
+          </div>
+        )}
+        {collapsed && (
+          <div className="flex items-center justify-center w-full">
+            <img
+              src={theme === 'dark' ? '/logo_biale.png' : '/logo_czarne.png'}
+              alt="KnowledgeTree Logo"
+              className="h-8 w-auto object-contain"
+            />
           </div>
         )}
         <button

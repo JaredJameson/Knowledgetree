@@ -12,10 +12,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/context/AuthContext';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useTheme } from '@/components/theme-provider';
 
 export function RegisterPage() {
   const { t } = useTranslation();
   const { register } = useAuth();
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -41,13 +43,20 @@ export function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">
-              {t('app.name')}
-            </h1>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-              {t('auth.register.subtitle')}
-            </p>
+          <div className="flex items-center gap-3">
+            <img
+              src={theme === 'dark' ? '/logo_biale.png' : '/logo_czarne.png'}
+              alt="KnowledgeTree Logo"
+              className="h-12 w-auto object-contain"
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+                {t('app.name')}
+              </h1>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+                {t('auth.register.subtitle')}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
