@@ -338,7 +338,7 @@ export default function WorkflowsPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Wybierz typ zadania" />
                   </SelectTrigger>
-                  <SelectContent className="z-50">
+                  <SelectContent>
                     <SelectItem value="research">
                       <div className="flex items-center gap-2">
                         <Target className="h-4 w-4 flex-shrink-0" />
