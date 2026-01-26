@@ -16,6 +16,7 @@ celery_app = Celery(
     backend=REDIS_URL,
     include=[
         "services.workflow_tasks",
+        "services.document_tasks",
     ]
 )
 
@@ -33,6 +34,7 @@ celery_app.conf.update(
         "services.workflow_tasks.execute_workflow": {"queue": "workflows"},
         "services.workflow_tasks.execute_research": {"queue": "research"},
         "services.workflow_tasks.execute_scraping": {"queue": "scraping"},
+        "services.document_tasks.process_document_task": {"queue": "documents"},
     },
     
     # Task result settings

@@ -38,7 +38,8 @@
       "loggingIn": "Logowanie...",
       "forgotPassword": "Zapomniałeś hasła?",
       "noAccount": "Nie masz konta?",
-      "registerLink": "Zarejestruj się"
+      "registerLink": "Zarejestruj się",
+      "failed": "Nie udało się zalogować"
     },
     "register": {
       "title": "Utwórz konto",
@@ -54,7 +55,8 @@
       "submit": "Zarejestruj się",
       "registering": "Rejestracja...",
       "hasAccount": "Masz już konto?",
-      "loginLink": "Zaloguj się"
+      "loginLink": "Zaloguj się",
+      "failed": "Nie udało się zarejestrować"
     },
     "logout": {
       "title": "Czy na pewno chcesz się wylogować?",
@@ -154,6 +156,9 @@
         "title": "Czat RAG",
         "description": "Rozmawiaj z AI o swoich dokumentach"
       }
+    },
+    "errors": {
+      "loadFailed": "Nie udało się załadować statystyk"
     }
   },
   "projects": {
@@ -199,6 +204,10 @@
       "conversations": "Rozmowy",
       "lastUpdated": "Ostatnia aktualizacja",
       "createdAt": "Utworzono"
+    },
+    "errors": {
+      "loadFailed": "Nie udało się załadować projektów",
+      "exportFailed": "Nie udało się wyeksportować projektu"
     }
   },
   "documents": {
@@ -275,6 +284,19 @@
       "deleting": "Usuwanie...",
       "success": "Dokument usunięty pomyślnie",
       "error": "Nie udało się usunąć dokumentu"
+    },
+    "progress": {
+      "starting": "Rozpoczynanie przetwarzania...",
+      "step": "Krok"
+    },
+    "errors": {
+      "loadFailed": "Nie udało się załadować dokumentów",
+      "exportFailed": "Nie udało się wyeksportować dokumentu"
+    }
+  },
+  "categories": {
+    "errors": {
+      "loadFailed": "Nie udało się załadować kategorii"
     }
   },
   "search": {
@@ -316,7 +338,9 @@
     "errors": {
       "searchFailed": "Nie udało się wykonać wyszukiwania",
       "noQuery": "Wprowadź zapytanie",
-      "noProject": "Wybierz projekt"
+      "noProject": "Wybierz projekt",
+      "exportFailed": "Nie udało się wyeksportować wyników wyszukiwania",
+      "loadProjectsFailed": "Nie udało się załadować projektów"
     }
   },
   "chat": {
@@ -378,7 +402,9 @@
       "loadFailed": "Nie udało się załadować rozmów",
       "deleteFailed": "Nie udało się usunąć rozmowy",
       "noMessage": "Wpisz wiadomość",
-      "noProject": "Wybierz projekt"
+      "noProject": "Wybierz projekt",
+      "loadProjectsFailed": "Nie udało się załadować projektów",
+      "loadArtifactFailed": "Nie udało się załadować artefaktu"
     }
   },
   "billing": {

@@ -148,7 +148,7 @@ export function ChatPage() {
         setSelectedProjectId(projectsData[0].id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load projects');
+      setError(err instanceof Error ? err.message : t('chat.errors.loadProjectsFailed'));
     } finally {
       setLoadingProjects(false);
     }
@@ -445,7 +445,7 @@ export function ChatPage() {
       setArtifactPanelOpen(true);
     } catch (err) {
       console.error('Failed to load artifact:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load artifact');
+      setError(err instanceof Error ? err.message : t('chat.errors.loadArtifactFailed'));
     } finally {
       setLoadingArtifact(false);
     }
@@ -813,7 +813,7 @@ export function ChatPage() {
                               {loadingArtifact ? (
                                 <>
                                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                  Loading...
+                                  {t('common.loading')}
                                 </>
                               ) : (
                                 <>

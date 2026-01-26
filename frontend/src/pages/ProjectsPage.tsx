@@ -80,7 +80,7 @@ export function ProjectsPage() {
       const projectsData = response.data.projects || response.data || [];
       setProjects(projectsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load projects');
+      setError(err instanceof Error ? err.message : t('projects.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -192,7 +192,7 @@ export function ProjectsPage() {
       const filename = `knowledgetree_project_${project.name}_${timestamp}.json`;
       downloadBlob(response.data, filename);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to export project');
+      setError(err instanceof Error ? err.message : t('projects.errors.exportFailed'));
     }
   };
 

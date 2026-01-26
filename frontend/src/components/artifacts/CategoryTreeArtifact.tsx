@@ -56,7 +56,7 @@ export function CategoryTreeArtifact({
       const response = await categoriesApi.getTree(projectId);
       setTree(response.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load categories');
+      setError(err instanceof Error ? err.message : t('categories.errors.loadFailed'));
     } finally {
       setLoading(false);
     }

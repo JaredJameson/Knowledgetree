@@ -169,17 +169,20 @@ async def process_document(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Trigger document processing (text extraction, chunking, and embedding generation)
+    Trigger document processing in background (text extraction, chunking, embedding generation)
 
-    This endpoint processes a PDF document through the complete pipeline:
+    This endpoint starts a background Celery task to process the PDF document through:
     1. Extract text using Docling (with PyMuPDF fallback)
     2. Split text into chunks (1000 chars, 200 overlap)
     3. Generate BGE-M3 embeddings for each chunk (1024 dimensions)
     4. Store chunks with embeddings in database for vector search
 
-    In production, this would be handled by a background worker.
+    The processing runs asynchronously in a Celery worker to avoid blocking the API.
+    Poll the document status using GET /documents/{id} to check completion.
     """
-    # Get document
+    from services.document_tasks import process_document_task
+
+    # Get document and verify access
     result = await db.execute(
         select(Document)
         .join(Project)
@@ -202,80 +205,261 @@ async def process_document(
             detail="Document already processed"
         )
 
+    if document.processing_status == ProcessingStatus.PROCESSING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document is already being processed"
+        )
+
     try:
         # Update status to processing
         document.processing_status = ProcessingStatus.PROCESSING
         await db.commit()
-
-        # Step 1: Extract text from PDF
-        pdf_path = Path(document.file_path)
-        extracted_text, page_count = pdf_processor.process_pdf(pdf_path)
-        logger.info(f"Extracted text from {page_count} pages")
-
-        # Step 2: Chunk the text (TIER 1 Phase 4: with contextual info)
-        chunks_data = text_chunker.chunk_text(extracted_text, document.id)
-        logger.info(f"Created {len(chunks_data)} chunks with contextual information")
-
-        # Step 3: Generate contextual embeddings for chunks (TIER 1 Phase 4)
-        logger.info("Generating contextual embeddings (including chunk_before + text + chunk_after)...")
-        embeddings = []
-        for chunk_data in chunks_data:
-            try:
-                # Generate contextual embedding
-                embedding = embedding_generator.generate_contextual_embedding(
-                    text=chunk_data["text"],
-                    chunk_before=chunk_data.get("chunk_before"),
-                    chunk_after=chunk_data.get("chunk_after")
-                )
-                embeddings.append(embedding)
-            except Exception as e:
-                logger.error(f"Failed to generate contextual embedding for chunk: {e}")
-                embeddings.append(None)
-
-        logger.info(f"Generated contextual embeddings for {len([e for e in embeddings if e])} chunks")
-
-        # Step 4: Store chunks with contextual embeddings in database
-        for i, chunk_data in enumerate(chunks_data):
-            embedding = embeddings[i]
-
-            # Skip if embedding generation failed (None)
-            if embedding is None:
-                logger.warning(f"Skipping chunk {i} - embedding generation failed")
-                continue
-
-            chunk = Chunk(
-                text=chunk_data["text"],
-                chunk_metadata=json.dumps(chunk_data["chunk_metadata"]),  # Serialize to JSON
-                chunk_before=chunk_data.get("chunk_before"),  # TIER 1 Phase 4
-                chunk_after=chunk_data.get("chunk_after"),    # TIER 1 Phase 4
-                embedding=embedding,  # Contextual embedding
-                has_embedding=1,
-                chunk_index=chunk_data["chunk_index"],
-                document_id=document.id
-            )
-            db.add(chunk)
-
-        # Update document status
-        document.page_count = page_count
-        document.processing_status = ProcessingStatus.COMPLETED
-        document.processed_at = func.now()
-        await db.commit()
         await db.refresh(document)
 
-        logger.info(f"Document processed successfully: {document.id} - {page_count} pages, {len(chunks_data)} chunks")
+        # Trigger background task (non-blocking)
+        task = process_document_task.delay(document_id)
+        
+        # Store task_id in Redis for progress tracking (TTL: 1 hour)
+        import redis
+        redis_client = redis.from_url(settings.REDIS_URL)
+        redis_client.setex(f"document_task:{document_id}", 3600, task.id)
+        
+        logger.info(f"Started background processing for document {document_id}, task_id: {task.id}")
 
+        # Return immediately with current document status
         return DocumentResponse.model_validate(document)
 
     except Exception as e:
-        logger.error(f"Document processing failed: {str(e)}")
+        logger.error(f"Failed to start document processing: {str(e)}")
         document.processing_status = ProcessingStatus.FAILED
-        document.error_message = str(e)
+        document.error_message = f"Failed to start processing: {str(e)}"
         await db.commit()
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Document processing failed: {str(e)}"
+            detail=f"Failed to start document processing: {str(e)}"
         )
+
+
+@router.get("/{document_id}/progress")
+async def get_document_progress(
+    document_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get current processing progress for a document (polling endpoint)
+    
+    Returns task status and progress information including:
+    - percentage: 0-100% progress
+    - step: current processing step (extraction, chunking, embeddings, storage, completed)
+    - message: detailed status message
+    - chunks_processed/chunks_total: for embedding generation
+    
+    Use this endpoint to poll for progress updates every 1-2 seconds.
+    For real-time streaming, use the /progress/stream endpoint instead.
+    """
+    import redis
+    from celery.result import AsyncResult
+    
+    # Verify document access
+    result = await db.execute(
+        select(Document)
+        .join(Project)
+        .where(
+            Document.id == document_id,
+            Project.owner_id == current_user.id
+        )
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found or access denied"
+        )
+    
+    # Get task_id from Redis
+    redis_client = redis.from_url(settings.REDIS_URL)
+    task_id = redis_client.get(f"document_task:{document_id}")
+    
+    if not task_id:
+        # No task found - check document status
+        return {
+            "status": document.processing_status.value,
+            "percentage": 100 if document.processing_status == ProcessingStatus.COMPLETED else 0,
+            "step": "completed" if document.processing_status == ProcessingStatus.COMPLETED else "pending",
+            "message": document.error_message if document.processing_status == ProcessingStatus.FAILED else "No active task"
+        }
+    
+    # Get task result from Celery
+    task_result = AsyncResult(task_id.decode('utf-8'), app=celery_app)
+    
+    if task_result.state == 'PENDING':
+        return {
+            "status": "pending",
+            "percentage": 0,
+            "step": "pending",
+            "message": "Task is queued and waiting to start"
+        }
+    elif task_result.state == 'PROGRESS':
+        return {
+            "status": "processing",
+            **task_result.info  # Contains: percentage, step, message, etc.
+        }
+    elif task_result.state == 'SUCCESS':
+        return {
+            "status": "completed",
+            "percentage": 100,
+            "step": "completed",
+            "message": "Processing complete",
+            **task_result.info
+        }
+    elif task_result.state == 'FAILURE':
+        return {
+            "status": "failed",
+            "percentage": 0,
+            "step": "failed",
+            "message": str(task_result.info)
+        }
+    else:
+        return {
+            "status": task_result.state.lower(),
+            "percentage": 0,
+            "step": task_result.state.lower(),
+            "message": f"Task state: {task_result.state}"
+        }
+
+
+@router.get("/{document_id}/progress/stream")
+async def stream_document_progress(
+    document_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Stream real-time processing progress via Server-Sent Events (SSE)
+    
+    This endpoint streams progress updates in real-time using Server-Sent Events.
+    The client should use EventSource to connect and receive updates.
+    
+    Events are sent every 500ms with current progress information:
+    - percentage: 0-100% progress
+    - step: current processing step
+    - message: detailed status message
+    
+    The stream automatically closes when processing completes or fails.
+    """
+    import redis
+    import asyncio
+    from celery.result import AsyncResult
+    from sse_starlette.sse import EventSourceResponse
+    
+    # Verify document access
+    result = await db.execute(
+        select(Document)
+        .join(Project)
+        .where(
+            Document.id == document_id,
+            Project.owner_id == current_user.id
+        )
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found or access denied"
+        )
+    
+    # Get task_id from Redis
+    redis_client = redis.from_url(settings.REDIS_URL)
+    task_id = redis_client.get(f"document_task:{document_id}")
+    
+    if not task_id:
+        # Return immediate response if no task
+        async def no_task_generator():
+            status = document.processing_status.value
+            yield {
+                "event": "progress",
+                "data": json.dumps({
+                    "status": status,
+                    "percentage": 100 if status == "completed" else 0,
+                    "step": status,
+                    "message": "No active processing task"
+                })
+            }
+            yield {"event": "close", "data": ""}
+        
+        return EventSourceResponse(no_task_generator())
+    
+    # Stream progress updates
+    async def event_generator():
+        from core.celery_app import celery_app
+        task_result = AsyncResult(task_id.decode('utf-8'), app=celery_app)
+        last_state = None
+        
+        while True:
+            try:
+                current_state = task_result.state
+                
+                # Send update if state changed
+                if current_state != last_state:
+                    if current_state == 'PENDING':
+                        data = {
+                            "status": "pending",
+                            "percentage": 0,
+                            "step": "pending",
+                            "message": "Task queued, waiting to start"
+                        }
+                    elif current_state == 'PROGRESS':
+                        data = {
+                            "status": "processing",
+                            **task_result.info
+                        }
+                    elif current_state == 'SUCCESS':
+                        data = {
+                            "status": "completed",
+                            "percentage": 100,
+                            "step": "completed",
+                            "message": "Processing complete",
+                            **task_result.info
+                        }
+                        yield {"event": "progress", "data": json.dumps(data)}
+                        yield {"event": "close", "data": ""}
+                        break
+                    elif current_state == 'FAILURE':
+                        data = {
+                            "status": "failed",
+                            "percentage": 0,
+                            "step": "failed",
+                            "message": str(task_result.info)
+                        }
+                        yield {"event": "progress", "data": json.dumps(data)}
+                        yield {"event": "close", "data": ""}
+                        break
+                    else:
+                        data = {
+                            "status": current_state.lower(),
+                            "message": f"Task state: {current_state}"
+                        }
+                    
+                    yield {"event": "progress", "data": json.dumps(data)}
+                    last_state = current_state
+                
+                # Poll every 500ms
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                logger.error(f"Error streaming progress: {str(e)}")
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"message": str(e)})
+                }
+                break
+    
+    return EventSourceResponse(event_generator())
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)

@@ -70,6 +70,14 @@ export function DocumentsPage() {
 
   // Processing state
   const [processingDocId, setProcessingDocId] = useState<number | null>(null);
+  
+  // Progress tracking state
+  const [documentProgress, setDocumentProgress] = useState<Record<number, {
+    percentage: number;
+    step: string;
+    message: string;
+    status: string;
+  }>>({});
 
   // Delete dialog state
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -107,7 +115,7 @@ export function DocumentsPage() {
         setSelectedProjectId(projectsData[0].id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load projects');
+      setError(err instanceof Error ? err.message : t('projects.errors.loadFailed'));
     } finally {
       setLoadingProjects(false);
     }
@@ -123,7 +131,7 @@ export function DocumentsPage() {
       const documentsData = response.data.documents || response.data || [];
       setDocuments(documentsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load documents');
+      setError(err instanceof Error ? err.message : t('documents.errors.loadFailed'));
     } finally {
       setLoadingDocuments(false);
     }
@@ -180,18 +188,64 @@ export function DocumentsPage() {
     disabled: uploading || !selectedProjectId
   });
 
-  // Process document
+  // Process document with real-time progress streaming
   const handleProcess = async (documentId: number) => {
     try {
       setProcessingDocId(documentId);
       setError('');
+      
+      // Initialize progress
+      setDocumentProgress(prev => ({
+        ...prev,
+        [documentId]: {
+          percentage: 0,
+          step: 'starting',
+          message: t('documents.progress.starting'),
+          status: 'processing'
+        }
+      }));
+      
+      // Start processing
       await documentsApi.process(documentId);
-
-      // Reload documents to get updated status
-      await loadDocuments();
+      
+      // Establish EventSource connection for real-time progress
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8765';
+      const token = localStorage.getItem('access_token');
+      const eventSource = new EventSource(
+        `${API_BASE_URL}/documents/${documentId}/progress/stream?token=${token}`
+      );
+      
+      eventSource.onmessage = (event) => {
+        if (event.type === 'progress') {
+          const progressData = JSON.parse(event.data);
+          setDocumentProgress(prev => ({
+            ...prev,
+            [documentId]: progressData
+          }));
+          
+          // Check if completed or failed
+          if (progressData.status === 'completed' || progressData.status === 'failed') {
+            eventSource.close();
+            setProcessingDocId(null);
+            // Reload documents to get final status
+            loadDocuments();
+          }
+        }
+      };
+      
+      eventSource.addEventListener('close', () => {
+        eventSource.close();
+      });
+      
+      eventSource.onerror = (error) => {
+        console.error('EventSource error:', error);
+        eventSource.close();
+        setProcessingDocId(null);
+        loadDocuments();
+      };
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : t('documents.process.error'));
-    } finally {
       setProcessingDocId(null);
     }
   };
@@ -247,7 +301,7 @@ export function DocumentsPage() {
       const exportFilename = `${cleanFilename}_${timestamp}.md`;
       downloadBlob(response.data, exportFilename);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to export document');
+      setError(err instanceof Error ? err.message : t('documents.errors.exportFailed'));
     }
   };
 
@@ -495,6 +549,29 @@ export function DocumentsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
+                    {/* Progress Bar for Processing Documents */}
+                    {doc.processing_status === 'processing' && documentProgress[doc.id] && (
+                      <div className="mb-4 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-primary-700 dark:text-primary-300">
+                            {documentProgress[doc.id].message}
+                          </span>
+                          <span className="text-primary-600 dark:text-primary-400 font-semibold">
+                            {documentProgress[doc.id].percentage}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-2.5">
+                          <div
+                            className="bg-primary-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
+                            style={{ width: `${documentProgress[doc.id].percentage}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-primary-600 dark:text-primary-400">
+                          {t('documents.progress.step')}: {documentProgress[doc.id].step}
+                        </p>
+                      </div>
+                    )}
+                    
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-neutral-600 dark:text-neutral-400">
                         {t('documents.stats.pages')}

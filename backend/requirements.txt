@@ -138,3 +138,4 @@ mypy>=1.8.0
 # Monitoring (Production)
 # ============================================================================
 # sentry-sdk[fastapi]>=1.40.0  # Uncomment for production
+sse-starlette==2.1.3

@@ -72,7 +72,7 @@ export function DashboardPage() {
         }
       } catch (err) {
         console.error('Failed to fetch dashboard statistics:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load statistics');
+        setError(err instanceof Error ? err.message : t('dashboard.errors.loadFailed'));
       } finally {
         setLoading(false);
       }

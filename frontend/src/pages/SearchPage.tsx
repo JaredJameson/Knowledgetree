@@ -102,7 +102,7 @@ export function SearchPage() {
         setSelectedProjectId(projectsData[0].id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load projects');
+      setError(err instanceof Error ? err.message : t('search.errors.loadProjectsFailed'));
     } finally {
       setLoadingProjects(false);
     }
@@ -197,7 +197,7 @@ export function SearchPage() {
       const filename = `search_results_${timestamp}.csv`;
       downloadBlob(response.data, filename);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to export search results');
+      setError(err instanceof Error ? err.message : t('search.errors.exportFailed'));
     }
   };
 

@@ -31,7 +31,7 @@ export function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : t('auth.login.failed'));
     } finally {
       setLoading(false);
     }
