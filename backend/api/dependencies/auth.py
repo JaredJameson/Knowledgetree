@@ -4,7 +4,7 @@ FastAPI dependencies for authentication and authorization
 """
 
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -30,6 +30,53 @@ async def get_current_user(
     Returns:
         User object
 
+    Raises:
+        HTTPException: If token is invalid or user not found
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    # Decode token
+    payload = decode_token(token)
+    if payload is None:
+        raise credentials_exception
+
+    # Extract email from token
+    email: Optional[str] = payload.get("sub")
+    if email is None:
+        raise credentials_exception
+
+    # Query user from database
+    result = await db.execute(
+        select(User).where(User.email == email)
+    )
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise credentials_exception
+
+    return user
+
+
+async def get_user_from_query_token(
+    token: str = Query(..., description="JWT token for authentication"),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """
+    Get the current authenticated user from JWT token in query parameter
+    
+    This is specifically for EventSource/SSE endpoints that cannot send custom headers.
+    
+    Args:
+        token: JWT token from query parameter
+        db: Database session
+    
+    Returns:
+        User object
+    
     Raises:
         HTTPException: If token is invalid or user not found
     """

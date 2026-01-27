@@ -23,7 +23,8 @@
     "back": "Back",
     "next": "Next",
     "previous": "Previous",
-    "language": "Language"
+    "language": "Language",
+    "export": "Export as Markdown"
   },
   "auth": {
     "login": {

@@ -26,7 +26,7 @@ from schemas.category import (
     GenerateTreeResponse,
     CategoryResponse,
 )
-from api.dependencies import get_current_active_user, check_documents_limit, check_storage_limit
+from api.dependencies import get_current_active_user, get_user_from_query_token, check_documents_limit, check_storage_limit
 from services.pdf_processor import PDFProcessor
 from services.text_chunker import TextChunker
 from services.embedding_generator import EmbeddingGenerator
@@ -335,7 +335,7 @@ async def get_document_progress(
 @router.get("/{document_id}/progress/stream")
 async def stream_document_progress(
     document_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_user_from_query_token),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -399,13 +399,19 @@ async def stream_document_progress(
         from core.celery_app import celery_app
         task_result = AsyncResult(task_id.decode('utf-8'), app=celery_app)
         last_state = None
-        
+        last_info = None
+
         while True:
             try:
                 current_state = task_result.state
-                
-                # Send update if state changed
-                if current_state != last_state:
+                current_info = task_result.info if task_result.info else {}
+
+                # Check if we should send an update
+                # Send if: state changed OR (in PROGRESS and info changed)
+                should_send = (current_state != last_state) or \
+                             (current_state == 'PROGRESS' and current_info != last_info)
+
+                if should_send:
                     if current_state == 'PENDING':
                         data = {
                             "status": "pending",
@@ -447,7 +453,8 @@ async def stream_document_progress(
                     
                     yield {"event": "progress", "data": json.dumps(data)}
                     last_state = current_state
-                
+                    last_info = current_info
+
                 # Poll every 500ms
                 await asyncio.sleep(0.5)
                 
@@ -605,6 +612,29 @@ async def delete_document(
                 logger.info(f"Deleted file: {file_path}")
     except Exception as e:
         logger.error(f"Failed to delete file: {str(e)}")
+
+    # Decrement usage counters
+    from services.usage_service import UsageService
+
+    # Decrement documents_uploaded counter
+    await UsageService.decrement_usage(
+        db=db,
+        user_id=current_user.id,
+        metric="documents_uploaded",
+        period="monthly",
+        amount=1
+    )
+
+    # Decrement storage_gb counter (convert bytes to GB)
+    if document.file_size:
+        storage_gb = document.file_size / (1024 ** 3)  # bytes to GB
+        await UsageService.decrement_usage(
+            db=db,
+            user_id=current_user.id,
+            metric="storage_gb",
+            period="monthly",
+            amount=int(storage_gb * 100) / 100  # Round to 2 decimal places
+        )
 
     # Delete from database
     await db.delete(document)

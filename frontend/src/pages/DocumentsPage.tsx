@@ -212,7 +212,7 @@ export function DocumentsPage() {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8765';
       const token = localStorage.getItem('access_token');
       const eventSource = new EventSource(
-        `${API_BASE_URL}/documents/${documentId}/progress/stream?token=${token}`
+        `${API_BASE_URL}/api/v1/documents/${documentId}/progress/stream?token=${token}`
       );
       
       eventSource.onmessage = (event) => {
@@ -697,16 +697,18 @@ export function DocumentsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('documents.delete.title')}</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>{t('documents.delete.description')}</p>
-              {deleteDocument && (
-                <p className="font-medium text-neutral-900 dark:text-neutral-50">
-                  {deleteDocument.filename}
-                </p>
-              )}
-              <p className="text-error-600 dark:text-error-400">
-                {t('documents.delete.warning')}
-              </p>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <div>{t('documents.delete.description')}</div>
+                {deleteDocument && (
+                  <div className="font-medium text-neutral-900 dark:text-neutral-50">
+                    {deleteDocument.filename}
+                  </div>
+                )}
+                <div className="text-error-600 dark:text-error-400">
+                  {t('documents.delete.warning')}
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

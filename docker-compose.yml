@@ -54,6 +54,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://knowledgetree:knowledgetree_secret@db:5432/knowledgetree
 
       # Redis
+      - REDIS_URL=redis://redis:6379/0
       - REDIS_HOST=redis
       - REDIS_PORT=6379
 

@@ -125,6 +125,24 @@ class UsageService:
         return usage
 
     @staticmethod
+    async def decrement_usage(
+        db: AsyncSession,
+        user_id: int,
+        metric: str,
+        period: str = "monthly",
+        amount: int = 1
+    ) -> Usage:
+        """Decrement usage counter (e.g., when deleting documents)"""
+        usage = await UsageService.get_or_create_usage(db, user_id, metric, period)
+        usage.value = max(0, usage.value - amount)  # Don't go below 0
+        usage.updated_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(usage)
+
+        logger.info(f"Decremented usage: user={user_id}, metric={metric}, value={usage.value}")
+        return usage
+
+    @staticmethod
     async def get_usage(
         db: AsyncSession,
         user_id: int,
