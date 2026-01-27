@@ -28,7 +28,21 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    
+
+    # Priority queue support (Redis broker)
+    # Priorities: 0 (lowest) to 9 (highest)
+    # Subscription tier mapping:
+    #   FREE: priority 3 (low)
+    #   STARTER: priority 5 (normal)
+    #   PROFESSIONAL: priority 7 (high)
+    #   ENTERPRISE: priority 9 (highest)
+    broker_transport_options={
+        "priority_steps": list(range(10)),  # Enable priorities 0-9
+        "sep": ":",
+        "queue_order_strategy": "priority",
+    },
+    task_default_priority=5,  # Default to normal priority
+
     # Task routing
     task_routes={
         "services.workflow_tasks.execute_workflow": {"queue": "workflows"},
@@ -36,22 +50,22 @@ celery_app.conf.update(
         "services.workflow_tasks.execute_scraping": {"queue": "scraping"},
         "services.document_tasks.process_document_task": {"queue": "documents"},
     },
-    
+
     # Task result settings
     result_expires=3600,  # 1 hour
     task_track_started=True,
-    
+
     # Worker settings
     worker_prefetch_multiplier=4,
     worker_concurrency=4,
-    
-    # Task time limits
-    task_time_limit=3600,  # 1 hour hard limit
-    task_soft_time_limit=3000,  # 50 minutes soft limit
-    
+
     # Retry settings
     task_acks_late=True,
     task_reject_on_worker_lost=True,
+
+    # Task time limits
+    task_time_limit=3600,  # 1 hour hard limit
+    task_soft_time_limit=3000,  # 50 minutes soft limit
 )
 
 

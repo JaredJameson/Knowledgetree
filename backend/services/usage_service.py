@@ -28,10 +28,11 @@ class UsageService:
             "enterprise": 20000,
         },
         "storage_gb": {
-            "free": 1,
-            "starter": 10,
-            "professional": 100,
-            "enterprise": 1000,  # 1 TB
+            # Stored as hundredths of GB: 100 units = 1 GB
+            "free": 100,  # 1 GB
+            "starter": 1000,  # 10 GB
+            "professional": 10000,  # 100 GB
+            "enterprise": 100000,  # 1000 GB (1 TB)
         },
         "documents_uploaded": {
             "free": 100,

@@ -15,6 +15,12 @@ from api.dependencies.limits import (
     check_storage_limit,
     check_projects_limit,
 )
+from api.dependencies.rate_limit import (
+    check_rate_limit,
+    increment_rate_limit,
+    get_rate_limit_info,
+    get_user_subscription_plan,
+)
 
 __all__ = [
     "get_current_user",
@@ -26,4 +32,8 @@ __all__ = [
     "check_documents_limit",
     "check_storage_limit",
     "check_projects_limit",
+    "check_rate_limit",
+    "increment_rate_limit",
+    "get_rate_limit_info",
+    "get_user_subscription_plan",
 ]

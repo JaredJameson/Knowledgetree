@@ -26,7 +26,15 @@ from schemas.category import (
     GenerateTreeResponse,
     CategoryResponse,
 )
-from api.dependencies import get_current_active_user, get_user_from_query_token, check_documents_limit, check_storage_limit
+from api.dependencies import (
+    get_current_active_user,
+    get_user_from_query_token,
+    check_documents_limit,
+    check_storage_limit,
+    check_rate_limit,
+    increment_rate_limit,
+    get_user_subscription_plan,
+)
 from services.pdf_processor import PDFProcessor
 from services.text_chunker import TextChunker
 from services.embedding_generator import EmbeddingGenerator
@@ -50,13 +58,16 @@ async def upload_document(
     project_id: int = Form(...),
     category_id: int = Form(None),
     current_user: User = Depends(get_current_active_user),
+    subscription_plan: str = Depends(get_user_subscription_plan),
     db: AsyncSession = Depends(get_db),
     _documents_limit: None = Depends(check_documents_limit()),
-    _storage_limit: None = Depends(check_storage_limit())
+    _storage_limit: None = Depends(check_storage_limit()),
+    _rate_limit: None = Depends(check_rate_limit("upload")),
 ):
     """
     Upload a document (PDF) for processing
 
+    - Checks rate limits per subscription tier (5-1000 uploads/hour)
     - Checks subscription limits (documents count and storage space)
     - Validates file type and size
     - Saves file to disk
@@ -133,17 +144,27 @@ async def upload_document(
             amount=1
         )
 
-        # Track storage usage (convert bytes to GB)
+        # Track storage usage (convert bytes to GB, store in hundredths)
+        # Storage is tracked as hundredths of GB: 0.01 GB = 1 unit, 1 GB = 100 units
         storage_gb = file_size / (1024 * 1024 * 1024)
+        storage_units = max(1, int(storage_gb * 100))  # Minimum 1 unit (0.01 GB)
         await usage_service.increment_usage(
             db=db,
             user_id=current_user.id,
             metric="storage_gb",
             period="monthly",
-            amount=int(storage_gb) if storage_gb >= 1 else 1  # Minimum 1 GB per document
+            amount=storage_units
         )
 
         logger.info(f"Document uploaded: {document.id} - {document.filename}, size: {file_size} bytes ({storage_gb:.2f} GB)")
+
+        # Increment rate limit counter
+        await increment_rate_limit(
+            action="upload",
+            current_user=current_user,
+            subscription_plan=subscription_plan,
+            amount=1
+        )
 
         return DocumentUploadResponse(
             id=document.id,
@@ -166,6 +187,7 @@ async def upload_document(
 async def process_document(
     document_id: int,
     current_user: User = Depends(get_current_active_user),
+    subscription_plan: str = Depends(get_user_subscription_plan),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -178,9 +200,11 @@ async def process_document(
     4. Store chunks with embeddings in database for vector search
 
     The processing runs asynchronously in a Celery worker to avoid blocking the API.
+    Tasks are prioritized based on subscription tier (free=low, enterprise=highest).
     Poll the document status using GET /documents/{id} to check completion.
     """
     from services.document_tasks import process_document_task
+    from services.priority_helper import get_task_priority
 
     # Get document and verify access
     result = await db.execute(
@@ -217,15 +241,25 @@ async def process_document(
         await db.commit()
         await db.refresh(document)
 
-        # Trigger background task (non-blocking)
-        task = process_document_task.delay(document_id)
-        
+        # Get task priority based on subscription tier
+        priority = get_task_priority(subscription_plan)
+        logger.info(f"Queueing document {document_id} with priority {priority} (plan: {subscription_plan})")
+
+        # Trigger background task (non-blocking) with priority
+        task = process_document_task.apply_async(
+            args=[document_id],
+            priority=priority
+        )
+
         # Store task_id in Redis for progress tracking (TTL: 1 hour)
         import redis
         redis_client = redis.from_url(settings.REDIS_URL)
         redis_client.setex(f"document_task:{document_id}", 3600, task.id)
-        
-        logger.info(f"Started background processing for document {document_id}, task_id: {task.id}")
+
+        logger.info(
+            f"Started background processing for document {document_id}, "
+            f"task_id: {task.id}, priority: {priority} ({subscription_plan})"
+        )
 
         # Return immediately with current document status
         return DocumentResponse.model_validate(document)
@@ -625,15 +659,16 @@ async def delete_document(
         amount=1
     )
 
-    # Decrement storage_gb counter (convert bytes to GB)
+    # Decrement storage_gb counter (convert bytes to GB, use hundredths)
     if document.file_size:
         storage_gb = document.file_size / (1024 ** 3)  # bytes to GB
+        storage_units = max(1, int(storage_gb * 100))  # Match increment logic
         await UsageService.decrement_usage(
             db=db,
             user_id=current_user.id,
             metric="storage_gb",
             period="monthly",
-            amount=int(storage_gb * 100) / 100  # Round to 2 decimal places
+            amount=storage_units
         )
 
     # Delete from database
