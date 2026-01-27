@@ -412,7 +412,7 @@ export function DocumentsPage() {
             {/* Project Selector */}
             <div className="w-64">
               <Select
-                value={selectedProjectId?.toString()}
+                value={selectedProjectId ? selectedProjectId.toString() : ""}
                 onValueChange={(value: string) => setSelectedProjectId(parseInt(value))}
                 disabled={loadingProjects}
               >
