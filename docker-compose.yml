@@ -161,7 +161,7 @@ services:
     restart: unless-stopped
     networks:
       - knowledgetree-network
-    command: celery -A core.celery_app worker --loglevel=info --concurrency=2 -Q documents,workflows,research,scraping
+    command: celery -A core.celery_app worker --loglevel=info --pool=solo -Q documents,workflows,research,scraping
 
   # React Frontend (Vite)
   frontend:
