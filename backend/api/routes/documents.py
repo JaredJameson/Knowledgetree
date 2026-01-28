@@ -186,6 +186,7 @@ async def upload_document(
 @router.post("/{document_id}/process", response_model=DocumentResponse)
 async def process_document(
     document_id: int,
+    force: bool = False,
     current_user: User = Depends(get_current_active_user),
     subscription_plan: str = Depends(get_user_subscription_plan),
     db: AsyncSession = Depends(get_db)
@@ -202,6 +203,8 @@ async def process_document(
     The processing runs asynchronously in a Celery worker to avoid blocking the API.
     Tasks are prioritized based on subscription tier (free=low, enterprise=highest).
     Poll the document status using GET /documents/{id} to check completion.
+
+    Use force=true to re-process documents that are stuck in PROCESSING status.
     """
     from services.document_tasks import process_document_task
     from services.priority_helper import get_task_priority
@@ -223,16 +226,16 @@ async def process_document(
             detail="Document not found or access denied"
         )
 
-    if document.processing_status == ProcessingStatus.COMPLETED:
+    if document.processing_status == ProcessingStatus.COMPLETED and not force:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Document already processed"
+            detail="Document already processed. Use force=true to re-process."
         )
 
-    if document.processing_status == ProcessingStatus.PROCESSING:
+    if document.processing_status == ProcessingStatus.PROCESSING and not force:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Document is already being processed"
+            detail="Document is already being processed. Use force=true to override."
         )
 
     try:
