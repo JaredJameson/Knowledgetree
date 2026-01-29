@@ -11,6 +11,8 @@ from urllib.parse import urljoin, urlparse
 import re
 from dataclasses import dataclass
 
+from services.content_extractor import content_extractor
+
 
 @dataclass
 class ScrapeResult:
@@ -22,6 +24,8 @@ class ScrapeResult:
     links: List[str]
     images: List[str]
     status_code: int
+    quality_score: float = 0.0  # 0.0-1.0
+    extraction_method: str = "basic"  # trafilatura | readability | basic
     error: Optional[str] = None
 
 
@@ -94,17 +98,18 @@ class HTTPScraper:
                 
                 # Parse HTML
                 soup = BeautifulSoup(response.text, 'lxml')
-                
-                # Extract title
-                title = ""
-                if soup.title:
-                    title = soup.title.string.strip() if soup.title.string else ""
-                
-                # Extract main content
-                content = self._extract_main_content(soup)
-                
-                # Extract text (for RAG/indexing)
-                text = soup.get_text(separator='\n', strip=True)
+
+                # Use SmartContentExtractor for intelligent content extraction
+                extracted = content_extractor.extract(
+                    html=response.text,
+                    url=str(response.url)
+                )
+
+                title = extracted.title
+                text = extracted.text
+                content = text  # For backward compatibility
+                quality_score = extracted.quality_score
+                extraction_method = extracted.method
                 
                 # Extract links
                 links = []
@@ -123,7 +128,9 @@ class HTTPScraper:
                     text=text,
                     links=links,
                     images=images,
-                    status_code=response.status_code
+                    status_code=response.status_code,
+                    quality_score=quality_score,
+                    extraction_method=extraction_method
                 )
         
         except httpx.HTTPStatusError as e:

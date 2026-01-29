@@ -9,6 +9,8 @@ from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 import os
 
+from services.content_extractor import content_extractor
+
 
 @dataclass
 class ScrapeResult:
@@ -20,6 +22,8 @@ class ScrapeResult:
     links: List[str]
     images: List[str]
     status_code: int
+    quality_score: float = 0.0  # 0.0-1.0
+    extraction_method: str = "basic"  # trafilatura | readability | basic
     error: Optional[str] = None
 
 
@@ -138,15 +142,21 @@ class FirecrawlScraper:
                 # Extract data from response
                 result = data.get("data", {})
                 metadata = result.get("metadata", {})
-                
+
+                # Calculate quality score for Firecrawl content
+                text_content = result.get("markdown", "")
+                quality_score = content_extractor._calculate_quality_score(text_content)
+
                 return ScrapeResult(
                     url=result.get("url", url),
                     title=metadata.get("title", ""),
                     content=result.get("html", ""),
-                    text=result.get("markdown", ""),
+                    text=text_content,
                     links=metadata.get("links", []) if extract_links else [],
                     images=metadata.get("images", []) if extract_images else [],
-                    status_code=200
+                    status_code=200,
+                    quality_score=quality_score,
+                    extraction_method="firecrawl"
                 )
         
         except httpx.HTTPStatusError as e:

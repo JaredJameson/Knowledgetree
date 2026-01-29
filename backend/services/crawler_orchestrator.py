@@ -31,6 +31,8 @@ class ScrapeResult:
     images: List[str]
     status_code: int
     engine: CrawlEngine
+    quality_score: float = 0.0  # 0.0-1.0
+    extraction_method: str = "basic"  # trafilatura | readability | basic
     error: Optional[str] = None
 
 
@@ -142,6 +144,8 @@ class CrawlerOrchestrator:
                     images=result.images,
                     status_code=result.status_code,
                     engine=engine,
+                    quality_score=result.quality_score,
+                    extraction_method=result.extraction_method,
                     error=result.error
                 )
             
@@ -156,6 +160,8 @@ class CrawlerOrchestrator:
                     images=result.images,
                     status_code=result.status_code,
                     engine=engine,
+                    quality_score=result.quality_score,
+                    extraction_method=result.extraction_method,
                     error=result.error
                 )
             
@@ -170,6 +176,8 @@ class CrawlerOrchestrator:
                     images=result.images,
                     status_code=result.status_code,
                     engine=engine,
+                    quality_score=result.quality_score,
+                    extraction_method=result.extraction_method,
                     error=result.error
                 )
         

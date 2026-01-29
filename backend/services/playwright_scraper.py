@@ -8,6 +8,8 @@ from typing import Optional, Dict, Any, List
 from urllib.parse import urljoin, urlparse
 from dataclasses import dataclass
 
+from services.content_extractor import content_extractor
+
 
 @dataclass
 class ScrapeResult:
@@ -19,6 +21,8 @@ class ScrapeResult:
     links: List[str]
     images: List[str]
     status_code: int
+    quality_score: float = 0.0  # 0.0-1.0
+    extraction_method: str = "basic"  # trafilatura | readability | basic
     error: Optional[str] = None
 
 
@@ -115,13 +119,21 @@ class PlaywrightScraper:
                 
                 # Extract data
                 result_url = page.url
-                title = await page.title()
-                
-                # Extract text content
-                text = await page.evaluate('() => document.body.innerText')
-                
-                # Extract HTML content
-                content = await page.evaluate('() => document.body.innerHTML')
+
+                # Get full HTML for smart content extraction
+                html_content = await page.content()
+
+                # Use SmartContentExtractor for intelligent content extraction
+                extracted = content_extractor.extract(
+                    html=html_content,
+                    url=result_url
+                )
+
+                title = extracted.title
+                text = extracted.text
+                content = text  # For backward compatibility
+                quality_score = extracted.quality_score
+                extraction_method = extracted.method
                 
                 # Extract links
                 links = []
@@ -154,7 +166,9 @@ class PlaywrightScraper:
                     text=text,
                     links=links,
                     images=images,
-                    status_code=200
+                    status_code=200,
+                    quality_score=quality_score,
+                    extraction_method=extraction_method
                 )
         
         except Exception as e:
