@@ -509,9 +509,12 @@ def process_agentic_crawl_task(
     Returns:
         Processing results with Document ID and extraction statistics
     """
-    # Use asyncio.run() which creates and manages event loop automatically
+    # Create new event loop for this Celery task
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     try:
-        result = asyncio.run(
+        result = loop.run_until_complete(
             _process_agentic_crawl_async(
                 self, crawl_job_id, urls, agent_prompt, project_id, engine, category_id
             )
@@ -519,8 +522,10 @@ def process_agentic_crawl_task(
         return result
     except Exception as e:
         logger.error(f"Agentic crawl task failed for job {crawl_job_id}: {str(e)}")
-        asyncio.run(_mark_crawl_job_failed(crawl_job_id, str(e)))
+        loop.run_until_complete(_mark_crawl_job_failed(crawl_job_id, str(e)))
         raise
+    finally:
+        loop.close()
 
 
 async def _process_agentic_crawl_async(
