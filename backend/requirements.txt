@@ -99,6 +99,10 @@ playwright>=1.48.0
 # Uncomment if you want to use Firecrawl:
 # firecrawl-py>=0.0.5
 
+# Smart Content Extraction (Quality Filtering)
+trafilatura>=1.6.0
+readability-lxml>=0.8.1
+
 # ============================================================================
 # YouTube Transcription (Video Content Extraction)
 # ============================================================================
