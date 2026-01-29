@@ -60,16 +60,14 @@ class AgenticCrawlRequest(BaseModel):
     """Request for agentic crawl with custom AI extraction prompt"""
     urls: List[HttpUrl] = Field(..., description="URLs to process (web or YouTube)", min_items=1, max_items=20)
     agent_prompt: str = Field(..., description="Custom natural language prompt for extraction", min_length=10, max_length=1000)
-    engine: Optional[CrawlEngineRequest] = Field(None, description="Force specific engine")
+    engine: Optional[CrawlEngineRequest] = Field(None, description="Optional: Force specific engine (auto-selected if not provided)")
     category_id: Optional[int] = Field(None, description="Parent category for organization")
 
     class Config:
         schema_extra = {
             "example": {
                 "urls": ["https://example.com/company-list"],
-                "agent_prompt": "wyciągnij wszystkie firmy z nazwą, adresem, danymi kontaktowymi i stroną internetową",
-                "engine": "http",
-                "category_id": None
+                "agent_prompt": "wyciągnij wszystkie firmy z nazwą, adresem, danymi kontaktowymi i stroną internetową"
             }
         }
 
@@ -289,24 +287,29 @@ async def crawl_with_agent_prompt(
     AI agents extract structured information according to the prompt.
     Results organized into knowledge tree and saved to project.
 
-    **Workflow:**
-    1. Content Acquisition: Scrape URLs or transcribe YouTube
-    2. Prompt-Guided Extraction: Use AI with custom instructions
-    3. Knowledge Organization: Build hierarchical tree
-    4. Persistence: Save as Document + Chunks + Categories
+    **🤖 Intelligent Engine Selection:**
+    - Engine is automatically selected based on URL patterns and task analysis
+    - HTTP: Fast, for static sites (blogs, documentation, Wikipedia)
+    - Playwright: For JavaScript-heavy sites (social media, e-commerce, SPAs)
+    - Firecrawl: Premium quality (if API key available)
 
-    **Example Prompts:**
+    **Workflow:**
+    1. **Engine Selection**: Intelligent analysis of URLs + prompt → optimal engine
+    2. **Content Acquisition**: Scrape URLs or transcribe YouTube
+    3. **Prompt-Guided Extraction**: Use AI with custom instructions
+    4. **Knowledge Organization**: Build hierarchical tree
+    5. **Persistence**: Save as Document + Chunks + Categories
+
+    **Example Prompts (Polish):**
     - "wyciągnij wszystkie firmy z nazwą, adresem, danymi kontaktowymi"
     - "wyciągnij wszystkie informacje odnośnie metodyki konserwacji drewna"
     - "wejdź na film YouTube, wyciągnij transkrypcję i zbuduj artykuł"
 
-    **Request Body:**
+    **Request Body (engine is optional):**
     ```json
     {
         "urls": ["https://example.com", "https://youtube.com/watch?v=xyz"],
-        "agent_prompt": "extract all companies with name, address, contact info, and website",
-        "engine": "http",
-        "category_id": null
+        "agent_prompt": "extract all companies with name, address, contact info"
     }
     ```
 

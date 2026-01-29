@@ -19,6 +19,7 @@ from services.youtube_transcriber import YouTubeTranscriber
 from services.text_chunker import TextChunker
 from services.embedding_generator import EmbeddingGenerator
 from services.crawler_orchestrator import CrawlEngine
+from services.intelligent_crawler_selector import IntelligentCrawlerSelector
 
 
 class AgenticCrawlWorkflow:
@@ -52,6 +53,10 @@ class AgenticCrawlWorkflow:
         self.youtube_transcriber = YouTubeTranscriber(anthropic_api_key=settings.ANTHROPIC_API_KEY)
         self.text_chunker = TextChunker()
         self.embedding_generator = EmbeddingGenerator()
+
+        # Intelligent engine selector (auto-detect Firecrawl availability)
+        firecrawl_available = bool(settings.FIRECRAWL_API_KEY)
+        self.engine_selector = IntelligentCrawlerSelector(firecrawl_available=firecrawl_available)
 
     async def execute(
         self,
@@ -103,6 +108,29 @@ class AgenticCrawlWorkflow:
         await db.commit()
 
         try:
+            # Step 0: Intelligent Engine Selection (if not specified)
+            if engine is None:
+                # Automatically select optimal engine based on URLs and task
+                engine = await self.engine_selector.select_engine(
+                    urls=urls,
+                    agent_prompt=agent_prompt,
+                    use_ai_analysis=True
+                )
+
+                # Log the selection
+                await self.analyzer_agent.log_reasoning(
+                    db, agent_workflow.id, "engine_selection",
+                    content=f"Auto-selected engine: {engine.value}",
+                    reasoning=f"Intelligent selection for: {agent_prompt[:100]}"
+                )
+
+                # Update workflow config with selected engine
+                config = json.loads(agent_workflow.config)
+                config["engine"] = engine.value
+                config["engine_auto_selected"] = True
+                agent_workflow.config = json.dumps(config)
+                await db.commit()
+
             # Step 1: Content Acquisition
             scraped_content = await self._acquire_content(
                 db, agent_workflow.id, urls, engine
