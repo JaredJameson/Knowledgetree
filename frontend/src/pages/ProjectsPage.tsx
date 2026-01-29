@@ -337,10 +337,11 @@ export function ProjectsPage() {
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-2">
-                <div className="grid grid-cols-2 gap-2 w-full">
+                <div className="flex gap-2 w-full">
                   <Button
                     variant="default"
                     size="sm"
+                    className="flex-1"
                     onClick={() => navigate('/documents')}
                   >
                     <FileText className="mr-2 h-4 w-4" />
@@ -349,13 +350,14 @@ export function ProjectsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1"
                     onClick={() => openCategoriesDialog(project)}
                   >
                     <FolderTree className="mr-2 h-4 w-4" />
                     {t('projects.categories', 'Categories')}
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-2 w-full">
+                <div className="flex flex-wrap gap-2 w-full">
                   <Button
                     variant="outline"
                     size="sm"
