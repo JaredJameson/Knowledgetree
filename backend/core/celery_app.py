@@ -49,6 +49,7 @@ celery_app.conf.update(
         "services.workflow_tasks.execute_research": {"queue": "research"},
         "services.workflow_tasks.execute_scraping": {"queue": "scraping"},
         "services.document_tasks.process_document_task": {"queue": "documents"},
+        "services.document_tasks.process_agentic_crawl_task": {"queue": "workflows"},
     },
 
     # Task result settings

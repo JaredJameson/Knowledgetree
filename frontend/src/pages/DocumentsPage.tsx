@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { AgenticCrawlDialog } from '@/components/AgenticCrawlDialog';
 import {
   Loader2,
   Upload,
@@ -611,7 +612,7 @@ export function DocumentsPage() {
                 </CardTitle>
                 <CardDescription>{t('documents.upload.description')}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div
                   {...getRootProps()}
                   className={`
@@ -654,6 +655,17 @@ export function DocumentsPage() {
                       </p>
                     </>
                   )}
+                </div>
+
+                {/* Agentic Crawl Option */}
+                <div className="flex items-center gap-4 pt-4 border-t">
+                  <div className="flex-1 text-sm text-neutral-600 dark:text-neutral-400">
+                    {t('documents.agenticCrawl.alternative', 'Lub użyj AI do ekstrakcji z internetu')}
+                  </div>
+                  <AgenticCrawlDialog
+                    projectId={selectedProjectId}
+                    onSuccess={() => loadDocuments()}
+                  />
                 </div>
               </CardContent>
             </Card>

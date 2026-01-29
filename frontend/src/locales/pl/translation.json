@@ -304,6 +304,23 @@
     "errors": {
       "loadFailed": "Nie udało się załadować dokumentów",
       "exportFailed": "Nie udało się wyeksportować dokumentu"
+    },
+    "agenticCrawl": {
+      "title": "Crawling Agentowy z AI",
+      "description": "Podaj URLe i instrukcję dla AI - system automatycznie wybierze najlepszy silnik crawlingu i wyciągnie strukturalne informacje.",
+      "alternative": "Lub użyj AI do ekstrakcji z internetu",
+      "urls": "URLe do przetworzenia",
+      "urlPlaceholder": "https://example.com",
+      "addUrl": "Dodaj URL",
+      "prompt": "Instrukcja ekstrakcji (AI prompt)",
+      "promptPlaceholder": "np. \"wyciągnij wszystkie firmy z nazwą, adresem i danymi kontaktowymi\" lub \"znajdź wszystkie informacje o metodykach konserwacji drewna\"",
+      "characters": "znaków",
+      "engineInfo": "🤖 System automatycznie wybierze optymalny silnik crawlingu (HTTP, Playwright lub Firecrawl) na podstawie analizy URLi i promptu.",
+      "errorNoUrls": "Dodaj przynajmniej jeden URL",
+      "errorPromptTooShort": "Prompt musi mieć minimum 10 znaków",
+      "start": "Rozpocznij Crawling",
+      "processing": "Przetwarzanie...",
+      "success": "✅ Zadanie utworzone! Job ID: {{jobId}}"
     }
   },
   "categories": {

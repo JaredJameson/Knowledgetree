@@ -13,6 +13,7 @@ from enum import Enum
 
 from core.database import get_db
 from models.document import Document
+from models.project import Project
 from models.crawl_job import CrawlJob, CrawlStatus
 from api.dependencies import get_current_user
 from models.user import User
@@ -327,6 +328,22 @@ async def crawl_with_agent_prompt(
     if len(urls) > 20:
         raise HTTPException(status_code=400, detail="Maximum 20 URLs per agentic crawl")
 
+    # Get user's first project (or create default if none exists)
+    result = await db.execute(
+        select(Project).where(Project.owner_id == current_user.id).limit(1)
+    )
+    project = result.scalar_one_or_none()
+
+    if not project:
+        # Create default project if user has none
+        project = Project(
+            name="Default Project",
+            description="Auto-created default project",
+            owner_id=current_user.id
+        )
+        db.add(project)
+        await db.flush()
+
     # Create CrawlJob with agent_prompt
     crawl_job = CrawlJob(
         url=urls[0],  # Primary URL
@@ -339,7 +356,7 @@ async def crawl_with_agent_prompt(
             "additional_urls": urls[1:] if len(urls) > 1 else []
         },
         agent_prompt=request.agent_prompt,  # Custom extraction prompt
-        project_id=current_user.id
+        project_id=project.id
     )
     db.add(crawl_job)
     await db.flush()
@@ -350,7 +367,7 @@ async def crawl_with_agent_prompt(
             "crawl_job_id": crawl_job.id,
             "urls": urls,
             "agent_prompt": request.agent_prompt,
-            "project_id": current_user.id,
+            "project_id": project.id,
             "engine": request.engine.value if request.engine else None,
             "category_id": request.category_id
         },
