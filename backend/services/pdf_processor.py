@@ -1,38 +1,50 @@
 """
-KnowledgeTree Backend - PDF Processing Service
-Extract text from PDF files using PyMuPDF and Docling
-Extract Table of Contents for automatic category tree generation
+KnowledgeTree Backend - Intelligent PDF Processing Service
+Intelligently selects optimal extraction tools based on document type
+Extracts text, tables, formulas, and TOC with smart fallback strategies
 """
 
 import os
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 import fitz  # PyMuPDF
 from docling.document_converter import DocumentConverter
 
 from .toc_extractor import TocExtractor, TocExtractionResult
 from .table_extractor import TableExtractor, TableExtractionResult
 from .formula_extractor import FormulaExtractor, FormulaExtractionResult
+from .document_classifier import (
+    DocumentClassifier,
+    ClassificationResult,
+    DocumentType,
+    ExtractionTool
+)
 
 logger = logging.getLogger(__name__)
 
 
 class PDFProcessor:
     """
-    PDF processing service
+    Intelligent PDF processing service
 
     Features:
-    - Text extraction (PyMuPDF, Docling)
+    - Automatic document type detection
+    - Smart tool selection based on content
+    - Text extraction (Docling, PyMuPDF)
     - Table of Contents extraction
-    - Table extraction (Phase 2)
-    - Formula extraction (Phase 2)
-    - File management
+    - Table extraction (Docling, pdfplumber)
+    - Formula extraction (Docling, regex)
+    - Extraction metadata tracking
+    - Intelligent fallback strategies
     """
 
     def __init__(self, upload_dir: str = "./uploads", toc_max_depth: int = 10):
         self.upload_dir = Path(upload_dir)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize document classifier
+        self.classifier = DocumentClassifier()
 
         # Initialize Docling converter
         self.docling_converter = DocumentConverter()
@@ -110,17 +122,25 @@ class PDFProcessor:
     def process_pdf(
         self,
         pdf_path: Path,
-        prefer_docling: bool = True
-    ) -> tuple[str, int]:
+        prefer_docling: bool = True,
+        auto_detect: bool = True
+    ) -> Tuple[str, int, Dict[str, Any]]:
         """
-        Process PDF file and extract text
+        Intelligently process PDF file and extract text
 
         Args:
             pdf_path: Path to PDF file
-            prefer_docling: Try Docling first, fallback to PyMuPDF
+            prefer_docling: Prefer Docling if auto_detect is False
+            auto_detect: Use intelligent document classification (recommended)
 
         Returns:
-            Tuple of (extracted_text, page_count)
+            Tuple of (extracted_text, page_count, extraction_metadata)
+
+        Extraction metadata includes:
+            - document_type: Classified document type
+            - extraction_tool: Tool used for extraction
+            - classification_confidence: Confidence score
+            - features: Detected document features
         """
         if not pdf_path.exists():
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
@@ -128,21 +148,109 @@ class PDFProcessor:
         if not pdf_path.suffix.lower() == '.pdf':
             raise ValueError(f"File is not a PDF: {pdf_path}")
 
+        metadata = {
+            "document_type": None,
+            "extraction_tool": None,
+            "classification_confidence": None,
+            "classification_reasoning": None,
+            "features": {}
+        }
+
         try:
-            if prefer_docling:
-                # Try Docling first (better layout understanding)
-                try:
-                    return self.extract_text_docling(pdf_path)
-                except Exception as e:
-                    logger.warning(f"Docling failed, falling back to PyMuPDF: {str(e)}")
-                    return self.extract_text_pymupdf(pdf_path)
+            if auto_detect:
+                # INTELLIGENT MODE: Classify document and select optimal tools
+                logger.info(f"🔍 Analyzing document type: {pdf_path.name}")
+                classification = self.classifier.classify(pdf_path)
+
+                metadata["document_type"] = classification.document_type.value
+                metadata["classification_confidence"] = classification.confidence
+                metadata["classification_reasoning"] = classification.reasoning
+                metadata["features"] = classification.features.to_dict()
+
+                logger.info(f"📋 {classification.reasoning}")
+
+                # Try recommended tools in order
+                text, page_count = self._extract_with_strategy(
+                    pdf_path,
+                    classification.recommended_tools,
+                    metadata
+                )
+
             else:
-                # Use PyMuPDF directly
-                return self.extract_text_pymupdf(pdf_path)
+                # LEGACY MODE: Simple preference-based selection
+                if prefer_docling:
+                    try:
+                        text, page_count = self.extract_text_docling(pdf_path)
+                        metadata["extraction_tool"] = "docling"
+                    except Exception as e:
+                        logger.warning(f"Docling failed, falling back to PyMuPDF: {str(e)}")
+                        text, page_count = self.extract_text_pymupdf(pdf_path)
+                        metadata["extraction_tool"] = "pymupdf"
+                else:
+                    text, page_count = self.extract_text_pymupdf(pdf_path)
+                    metadata["extraction_tool"] = "pymupdf"
+
+            return text, page_count, metadata
 
         except Exception as e:
             logger.error(f"PDF processing failed for {pdf_path}: {str(e)}")
             raise
+
+    def _extract_with_strategy(
+        self,
+        pdf_path: Path,
+        recommended_tools: list[ExtractionTool],
+        metadata: Dict[str, Any]
+    ) -> Tuple[str, int]:
+        """
+        Extract text using recommended tools with fallback strategy
+
+        Args:
+            pdf_path: Path to PDF file
+            recommended_tools: Ordered list of tools to try
+            metadata: Metadata dict to update with used tool
+
+        Returns:
+            Tuple of (extracted_text, page_count)
+        """
+        last_error = None
+
+        for tool in recommended_tools:
+            try:
+                logger.info(f"🔧 Attempting extraction with: {tool.value}")
+
+                if tool == ExtractionTool.DOCLING:
+                    text, page_count = self.extract_text_docling(pdf_path)
+                    metadata["extraction_tool"] = "docling"
+                    logger.info(f"✅ Successfully extracted with Docling")
+                    return text, page_count
+
+                elif tool == ExtractionTool.PYMUPDF:
+                    text, page_count = self.extract_text_pymupdf(pdf_path)
+                    metadata["extraction_tool"] = "pymupdf"
+                    logger.info(f"✅ Successfully extracted with PyMuPDF")
+                    return text, page_count
+
+                elif tool == ExtractionTool.PDFPLUMBER:
+                    # TODO: Implement pdfplumber extraction
+                    logger.warning("pdfplumber not yet implemented, skipping")
+                    continue
+
+                elif tool == ExtractionTool.PYTESSERACT:
+                    # TODO: Implement OCR extraction
+                    logger.warning("pytesseract not yet implemented, skipping")
+                    continue
+
+            except Exception as e:
+                last_error = e
+                logger.warning(f"⚠️ {tool.value} failed: {str(e)}")
+                continue
+
+        # All tools failed - raise last error
+        if last_error:
+            raise last_error
+        else:
+            raise RuntimeError("No extraction tools succeeded")
 
     def save_uploaded_file(
         self,
@@ -332,10 +440,11 @@ class PDFProcessor:
         extract_toc: bool = True,
         extract_tables: bool = False,
         extract_formulas: bool = False,
-        prefer_docling: bool = True
+        prefer_docling: bool = True,
+        auto_detect: bool = True
     ) -> Dict[str, Any]:
         """
-        Full PDF processing with text, ToC, tables, and formulas extraction
+        Full PDF processing with intelligent tool selection
 
         Args:
             pdf_path: Path to PDF file
@@ -343,50 +452,72 @@ class PDFProcessor:
             extract_toc: Extract Table of Contents (Phase 1)
             extract_tables: Extract tables (Phase 2)
             extract_formulas: Extract formulas (Phase 2)
-            prefer_docling: Use Docling for text extraction
+            prefer_docling: Prefer Docling if auto_detect is False
+            auto_detect: Use intelligent document classification (recommended)
 
         Returns:
             Dictionary with processing results:
             {
                 'text': str,
                 'page_count': int,
+                'extraction_metadata': {
+                    'document_type': str,
+                    'extraction_tool': str,
+                    'classification_confidence': float,
+                    'classification_reasoning': str,
+                    'features': dict
+                },
                 'toc': TocExtractionResult,
                 'tables': TableExtractionResult,
                 'formulas': FormulaExtractionResult,
                 'file_info': dict
             }
         """
-        logger.info(f"Full PDF processing: {pdf_path.name}")
+        logger.info(f"🚀 Full PDF processing: {pdf_path.name}")
 
         results = {
             'text': None,
             'page_count': None,
+            'extraction_metadata': {},
             'toc': None,
             'tables': None,
             'formulas': None,
             'file_info': self.get_file_info(pdf_path)
         }
 
-        # Extract text
+        # Extract text with intelligent tool selection
         if extract_text:
-            text, page_count = self.process_pdf(pdf_path, prefer_docling=prefer_docling)
+            text, page_count, metadata = self.process_pdf(
+                pdf_path,
+                prefer_docling=prefer_docling,
+                auto_detect=auto_detect
+            )
             results['text'] = text
             results['page_count'] = page_count
+            results['extraction_metadata'] = metadata
 
         # Extract ToC (Phase 1)
         if extract_toc:
             toc_result = self.extract_toc(pdf_path)
             results['toc'] = toc_result
 
-        # Extract tables (Phase 2)
+        # Extract tables (Phase 2) - if document has tables
         if extract_tables:
-            tables_result = self.extract_tables(pdf_path)
-            results['tables'] = tables_result
+            # Skip if classification says no tables
+            if results.get('extraction_metadata', {}).get('features', {}).get('table_count', 0) > 0:
+                tables_result = self.extract_tables(pdf_path)
+                results['tables'] = tables_result
+            else:
+                logger.info("ℹ️ Skipping table extraction (no tables detected)")
 
-        # Extract formulas (Phase 2)
+        # Extract formulas (Phase 2) - if document has formulas
         if extract_formulas:
-            formulas_result = self.extract_formulas(pdf_path)
-            results['formulas'] = formulas_result
+            # Skip if classification says no formulas
+            if results.get('extraction_metadata', {}).get('features', {}).get('formula_count', 0) > 0:
+                formulas_result = self.extract_formulas(pdf_path)
+                results['formulas'] = formulas_result
+            else:
+                logger.info("ℹ️ Skipping formula extraction (no formulas detected)")
 
         logger.info(f"✅ PDF processing complete: {pdf_path.name}")
         return results

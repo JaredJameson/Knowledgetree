@@ -180,3 +180,38 @@ class CategoryListResponse(BaseModel):
             ]
         }
     }
+
+
+class CategoryContentResponse(BaseModel):
+    """Category content with chunks, tables, and formulas"""
+    category_id: int
+    category_name: str
+    chunks: List[dict]
+    tables: List[dict]
+    formulas: List[dict]
+    total_chunks: int
+    total_tables: int
+    total_formulas: int
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "category_id": 1,
+                    "category_name": "Introduction",
+                    "chunks": [
+                        {
+                            "id": 1,
+                            "text": "Sample text chunk...",
+                            "chunk_index": 0
+                        }
+                    ],
+                    "tables": [],
+                    "formulas": [],
+                    "total_chunks": 1,
+                    "total_tables": 0,
+                    "total_formulas": 0
+                }
+            ]
+        }
+    }

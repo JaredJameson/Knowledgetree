@@ -14,12 +14,16 @@ from core.database import get_db
 from models.user import User
 from models.category import Category
 from models.project import Project
+from models.chunk import Chunk
+from models.document_table import DocumentTable
+from models.document_formula import DocumentFormula
 from schemas.category import (
     CategoryCreate,
     CategoryUpdate,
     CategoryResponse,
     CategoryTreeNode,
     CategoryListResponse,
+    CategoryContentResponse,
 )
 from api.dependencies import get_current_active_user
 
@@ -99,6 +103,95 @@ async def get_category_or_404(
         )
 
     return category
+
+
+@router.get("/{category_id}/content", response_model=CategoryContentResponse)
+async def get_category_content(
+    category_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get content assigned to a category (chunks, tables, formulas)
+
+    Returns all chunks, tables, and formulas that belong to this category.
+    Content is assigned based on page ranges during category tree generation.
+
+    Args:
+        category_id: Category ID
+
+    Returns:
+        CategoryContentResponse with all content items
+    """
+    # Get category with access control
+    category = await get_category_or_404(category_id, current_user, db)
+
+    # Get chunks for this category
+    chunks_result = await db.execute(
+        select(Chunk)
+        .where(Chunk.category_id == category_id)
+        .order_by(Chunk.chunk_index)
+    )
+    chunks = chunks_result.scalars().all()
+
+    # Get tables for this category
+    tables_result = await db.execute(
+        select(DocumentTable)
+        .where(DocumentTable.category_id == category_id)
+        .order_by(DocumentTable.table_index)
+    )
+    tables = tables_result.scalars().all()
+
+    # Get formulas for this category
+    formulas_result = await db.execute(
+        select(DocumentFormula)
+        .where(DocumentFormula.category_id == category_id)
+        .order_by(DocumentFormula.formula_index)
+    )
+    formulas = formulas_result.scalars().all()
+
+    logger.info(
+        f"Category {category_id} content: {len(chunks)} chunks, "
+        f"{len(tables)} tables, {len(formulas)} formulas"
+    )
+
+    return CategoryContentResponse(
+        category_id=category_id,
+        category_name=category.name,
+        chunks=[
+            {
+                "id": chunk.id,
+                "text": chunk.text,
+                "chunk_index": chunk.chunk_index,
+            }
+            for chunk in chunks
+        ],
+        tables=[
+            {
+                "id": table.id,
+                "table_index": table.table_index,
+                "page_number": table.page_number,
+                "row_count": table.row_count,
+                "col_count": table.col_count,
+                "table_data": table.table_data,
+            }
+            for table in tables
+        ],
+        formulas=[
+            {
+                "id": formula.id,
+                "formula_index": formula.formula_index,
+                "page_number": formula.page_number,
+                "latex_content": formula.latex_content,
+                "context_before": formula.context_before,
+                "context_after": formula.context_after,
+            }
+            for formula in formulas
+        ],
+        total_chunks=len(chunks),
+        total_tables=len(tables),
+        total_formulas=len(formulas),
+    )
 
 
 @router.get("/", response_model=CategoryListResponse)

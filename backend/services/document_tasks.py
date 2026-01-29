@@ -78,13 +78,34 @@ async def _process_document_async(task, document_id: int) -> Dict[str, Any]:
 
             logger.info(f"Starting document processing: {document_id}")
 
-            # Step 1: Extract text from PDF
+            # Step 1: Extract text from PDF with intelligent tool selection
             pdf_path = Path(document.file_path)
             if not pdf_path.exists():
                 raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-            extracted_text, page_count = pdf_processor.process_pdf(pdf_path)
-            logger.info(f"Document {document_id}: Extracted text from {page_count} pages")
+            # Run PDF processing in thread to avoid event loop conflicts with Docling
+            extracted_text, page_count, extraction_metadata = await asyncio.to_thread(
+                pdf_processor.process_pdf,
+                pdf_path,
+                auto_detect=True  # Enable intelligent document classification
+            )
+
+            # Log extraction metadata
+            doc_type = extraction_metadata.get('document_type', 'unknown')
+            tool_used = extraction_metadata.get('extraction_tool', 'unknown')
+            confidence = extraction_metadata.get('classification_confidence', 0)
+            reasoning = extraction_metadata.get('classification_reasoning', '')
+
+            logger.info(
+                f"Document {document_id}: Extracted text from {page_count} pages\n"
+                f"  Type: {doc_type} (confidence: {confidence:.0%})\n"
+                f"  Tool: {tool_used}\n"
+                f"  Reasoning: {reasoning}"
+            )
+
+            # Store extraction metadata in document record
+            document.extraction_metadata = extraction_metadata
+            await db.commit()
 
             # Update progress (Step 1: 10% complete)
             task.update_state(
@@ -96,7 +117,9 @@ async def _process_document_async(task, document_id: int) -> Dict[str, Any]:
                     'step': 'extraction',
                     'percentage': 10,
                     'page_count': page_count,
-                    'message': f'Extracted text from {page_count} pages'
+                    'document_type': doc_type,
+                    'extraction_tool': tool_used,
+                    'message': f'Extracted text from {page_count} pages using {tool_used} ({doc_type})'
                 }
             )
 

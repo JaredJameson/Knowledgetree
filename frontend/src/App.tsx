@@ -9,6 +9,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { DocumentExplorerPage } from './pages/DocumentExplorerPage';
 import { SearchPage } from './pages/SearchPage';
 import { ChatPage } from './pages/ChatPage';
 import BillingPage from './pages/BillingPage';
@@ -42,6 +43,7 @@ function App() {
       <Route path="/dashboard" element={<ProtectedRouteWithLayout><DashboardPage /></ProtectedRouteWithLayout>} />
       <Route path="/projects" element={<ProtectedRouteWithLayout><ProjectsPage /></ProtectedRouteWithLayout>} />
       <Route path="/documents" element={<ProtectedRouteWithLayout><DocumentsPage /></ProtectedRouteWithLayout>} />
+      <Route path="/documents/:documentId/explorer" element={<ProtectedRouteWithLayout><DocumentExplorerPage /></ProtectedRouteWithLayout>} />
       <Route path="/search" element={<ProtectedRouteWithLayout><SearchPage /></ProtectedRouteWithLayout>} />
       <Route path="/chat" element={<ProtectedRouteWithLayout><ChatPage /></ProtectedRouteWithLayout>} />
       <Route path="/billing" element={<ProtectedRouteWithLayout><BillingPage /></ProtectedRouteWithLayout>} />

@@ -167,6 +167,8 @@ class CategoryTreeGenerator:
             icon=self._get_icon_for_depth(current_depth),
             depth=current_depth,
             order=stats["total_created"],  # Sequential order
+            page_start=entry.page,  # Starting page from ToC
+            page_end=None,  # Will be calculated from next entry or children
             parent_id=parent_id,
             project_id=project_id,
         )

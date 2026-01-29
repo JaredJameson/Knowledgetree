@@ -86,8 +86,6 @@ export function DocumentsPage() {
 
   // Generate tree state
   const [generatingTreeDocId, setGeneratingTreeDocId] = useState<number | null>(null);
-  const [generateTreeResult, setGenerateTreeResult] = useState<GenerateTreeResponse | null>(null);
-  const [generateTreeDialogOpen, setGenerateTreeDialogOpen] = useState(false);
 
   // Load projects on mount
   useEffect(() => {
@@ -102,6 +100,86 @@ export function DocumentsPage() {
       setDocuments([]);
     }
   }, [selectedProjectId]);
+
+  // Auto-reconnect SSE for processing documents after page refresh
+  useEffect(() => {
+    const eventSources: Map<number, EventSource> = new Map();
+
+    documents.forEach(doc => {
+      if (doc.processing_status?.toLowerCase() === 'processing') {
+        console.log(`🔄 Auto-connecting SSE for document ${doc.id} (status: ${doc.processing_status})`);
+
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8765';
+        const token = localStorage.getItem('access_token');
+        const streamUrl = `${API_BASE_URL}/api/v1/documents/${doc.id}/progress/stream?token=${token}`;
+
+        const eventSource = new EventSource(streamUrl);
+        eventSources.set(doc.id, eventSource);
+
+        eventSource.onopen = () => {
+          console.log(`✅ SSE auto-connected for document ${doc.id}`);
+        };
+
+        eventSource.addEventListener('progress', (event) => {
+          console.log(`📊 Progress event (auto) for doc ${doc.id}:`, event.data);
+          const progressData = JSON.parse(event.data);
+
+          // Translate message to Polish
+          if (progressData.message) {
+            progressData.message = translateProgressMessage(progressData.message, progressData.step);
+          }
+
+          // Translate step name
+          if (progressData.step) {
+            const stepKey = `documents.progress.steps.${progressData.step}`;
+            const translatedStep = t(stepKey);
+            if (translatedStep !== stepKey) {
+              progressData.step = translatedStep;
+            }
+          }
+
+          console.log(`🔑 Setting documentProgress[${doc.id}] (type: ${typeof doc.id})`);
+          setDocumentProgress(prev => {
+            const updated = {
+              ...prev,
+              [doc.id]: progressData
+            };
+            console.log('📦 Updated documentProgress:', updated);
+            return updated;
+          });
+
+          if (progressData.status === 'completed' || progressData.status === 'failed') {
+            console.log(`🏁 Processing complete (auto) for doc ${doc.id}:`, progressData.status);
+            eventSource.close();
+            eventSources.delete(doc.id);
+            loadDocuments();
+          }
+        });
+
+        eventSource.addEventListener('close', () => {
+          console.log(`🔒 SSE connection closed (auto) for doc ${doc.id}`);
+          eventSource.close();
+          eventSources.delete(doc.id);
+        });
+
+        eventSource.onerror = (error) => {
+          console.error(`❌ EventSource error (auto) for doc ${doc.id}:`, error);
+          eventSource.close();
+          eventSources.delete(doc.id);
+        };
+      }
+    });
+
+    // Cleanup: close all EventSource connections on unmount
+    return () => {
+      console.log('🧹 Cleaning up auto-connected EventSources');
+      eventSources.forEach((eventSource, docId) => {
+        console.log(`🔌 Closing EventSource for doc ${docId}`);
+        eventSource.close();
+      });
+      eventSources.clear();
+    };
+  }, [documents]);
 
   const loadProjects = async () => {
     try {
@@ -119,6 +197,45 @@ export function DocumentsPage() {
     } finally {
       setLoadingProjects(false);
     }
+  };
+
+  // Translate backend progress messages to Polish
+  const translateProgressMessage = (message: string, step: string): string => {
+    // Embeddings generation: "Generated X/Y embeddings (Z%)"
+    const embeddingsMatch = message.match(/Generated (\d+)\/(\d+) embeddings \((\d+)%\)/);
+    if (embeddingsMatch) {
+      return `Przygotowywanie do wyszukiwania ${embeddingsMatch[1]}/${embeddingsMatch[2]} (${embeddingsMatch[3]}%)`;
+    }
+
+    // Chunking: "Created X text chunks"
+    const chunksMatch = message.match(/Created (\d+) text chunks/);
+    if (chunksMatch) {
+      return `Podzielono na ${chunksMatch[1]} fragmentów`;
+    }
+
+    // Extraction: "Extracted text from X pages" or "Text extraction complete"
+    if (message.includes('extraction complete') || message.includes('Extracted text')) {
+      const pagesMatch = message.match(/(\d+) pages/);
+      if (pagesMatch) {
+        return `Wyodrębniono tekst z ${pagesMatch[1]} stron`;
+      }
+      return 'Wyodrębnianie tekstu zakończone';
+    }
+
+    // Storage: "Storing X chunks" or similar
+    const storingMatch = message.match(/Storing (\d+) chunks/);
+    if (storingMatch) {
+      return `Zapisywanie ${storingMatch[1]} fragmentów`;
+    }
+
+    // Storage complete: "Successfully processed X pages into Y chunks"
+    const successMatch = message.match(/Successfully processed (\d+) pages into (\d+) chunks/);
+    if (successMatch) {
+      return `Pomyślnie przetworzono ${successMatch[1]} stron na ${successMatch[2]} fragmentów`;
+    }
+
+    // Fallback: use original message
+    return message;
   };
 
   const loadDocuments = async () => {
@@ -211,34 +328,63 @@ export function DocumentsPage() {
       // Establish EventSource connection for real-time progress
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8765';
       const token = localStorage.getItem('access_token');
-      const eventSource = new EventSource(
-        `${API_BASE_URL}/api/v1/documents/${documentId}/progress/stream?token=${token}`
-      );
-      
-      eventSource.onmessage = (event) => {
-        if (event.type === 'progress') {
-          const progressData = JSON.parse(event.data);
-          setDocumentProgress(prev => ({
-            ...prev,
-            [documentId]: progressData
-          }));
-          
-          // Check if completed or failed
-          if (progressData.status === 'completed' || progressData.status === 'failed') {
-            eventSource.close();
-            setProcessingDocId(null);
-            // Reload documents to get final status
-            loadDocuments();
+      const streamUrl = `${API_BASE_URL}/api/v1/documents/${documentId}/progress/stream?token=${token}`;
+      console.log('🔗 Connecting to SSE stream:', streamUrl);
+
+      const eventSource = new EventSource(streamUrl);
+
+      eventSource.onopen = () => {
+        console.log('✅ SSE connection opened');
+      };
+
+      // Listen for 'progress' events from SSE
+      eventSource.addEventListener('progress', (event) => {
+        console.log('📊 Progress event received:', event.data);
+        const progressData = JSON.parse(event.data);
+
+        // Translate message to Polish
+        if (progressData.message) {
+          progressData.message = translateProgressMessage(progressData.message, progressData.step);
+        }
+
+        // Translate step name
+        if (progressData.step) {
+          const stepKey = `documents.progress.steps.${progressData.step}`;
+          const translatedStep = t(stepKey);
+          if (translatedStep !== stepKey) {
+            progressData.step = translatedStep;
           }
         }
-      };
-      
-      eventSource.addEventListener('close', () => {
-        eventSource.close();
+
+        console.log(`🔑 Setting documentProgress[${documentId}] (type: ${typeof documentId})`);
+        setDocumentProgress(prev => {
+          const updated = {
+            ...prev,
+            [documentId]: progressData
+          };
+          console.log('📦 Updated documentProgress:', updated);
+          return updated;
+        });
+
+        // Check if completed or failed
+        if (progressData.status === 'completed' || progressData.status === 'failed') {
+          console.log('🏁 Processing complete:', progressData.status);
+          eventSource.close();
+          setProcessingDocId(null);
+          // Reload documents to get final status
+          loadDocuments();
+        }
       });
-      
+
+      eventSource.addEventListener('close', () => {
+        console.log('🔒 SSE connection closed by server');
+        eventSource.close();
+        setProcessingDocId(null);
+      });
+
       eventSource.onerror = (error) => {
-        console.error('EventSource error:', error);
+        console.error('❌ EventSource error:', error);
+        console.log('EventSource readyState:', eventSource.readyState);
         eventSource.close();
         setProcessingDocId(null);
         loadDocuments();
@@ -283,8 +429,8 @@ export function DocumentsPage() {
         validate_depth: true,
       });
 
-      setGenerateTreeResult(response.data);
-      setGenerateTreeDialogOpen(true);
+      // Redirect to Document Explorer instead of showing popup
+      navigate(`/documents/${documentId}/explorer`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('documents.generateTree.error', 'Failed to generate category tree'));
     } finally {
@@ -550,7 +696,17 @@ export function DocumentsPage() {
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {/* Progress Bar for Processing Documents */}
-                    {doc.processing_status === 'processing' && documentProgress[doc.id] && (
+                    {(() => {
+                      const isProcessing = doc.processing_status?.toLowerCase() === 'processing';
+                      const hasProgress = documentProgress[doc.id];
+                      console.log(`🎨 Render check for doc ${doc.id} (type: ${typeof doc.id}):`, {
+                        isProcessing,
+                        hasProgress,
+                        progressData: hasProgress ? documentProgress[doc.id] : 'none',
+                        allProgressKeys: Object.keys(documentProgress)
+                      });
+                      return isProcessing && hasProgress;
+                    })() && (
                       <div className="mb-4 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium text-primary-700 dark:text-primary-300">
@@ -606,8 +762,9 @@ export function DocumentsPage() {
                     </div>
                   </CardContent>
                   <CardFooter className="flex flex-col gap-2">
-                    <div className="flex gap-2 w-full">
-                      {doc.processing_status === 'pending' && (
+                    {/* Primary Actions Row */}
+                    {doc.processing_status === 'pending' && (
+                      <div className="flex gap-2 w-full">
                         <Button
                           size="sm"
                           onClick={() => handleProcess(doc.id)}
@@ -626,62 +783,70 @@ export function DocumentsPage() {
                             </>
                           )}
                         </Button>
-                      )}
-                      {doc.processing_status === 'completed' && (
-                        <>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleGenerateTree(doc.id)}
-                            disabled={generatingTreeDocId === doc.id}
-                            className="flex-1"
-                          >
-                            {generatingTreeDocId === doc.id ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                {t('documents.generateTree.generating', 'Generating...')}
-                              </>
-                            ) : (
-                              <>
-                                <FolderTree className="mr-2 h-4 w-4" />
-                                {t('documents.actions.generateTree', 'Generate Categories')}
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleProcess(doc.id)}
-                            disabled={processingDocId === doc.id}
-                          >
-                            {processingDocId === doc.id ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                {t('documents.process.processing')}
-                              </>
-                            ) : (
-                              <>
-                                <Play className="mr-2 h-4 w-4" />
-                                {t('documents.actions.reprocess')}
-                              </>
-                            )}
-                          </Button>
-                        </>
-                      )}
+                      </div>
+                    )}
+                    {doc.processing_status === 'completed' && (
+                      <div className="flex gap-2 w-full">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleGenerateTree(doc.id)}
+                          disabled={generatingTreeDocId === doc.id}
+                          className="flex-1"
+                        >
+                          {generatingTreeDocId === doc.id ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              {t('documents.generateTree.generating', 'Generating...')}
+                            </>
+                          ) : (
+                            <>
+                              <FolderTree className="mr-2 h-4 w-4" />
+                              {t('documents.actions.generateTree', 'Generate Categories')}
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleProcess(doc.id)}
+                          disabled={processingDocId === doc.id}
+                          className="flex-1"
+                        >
+                          {processingDocId === doc.id ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              {t('documents.process.processing')}
+                            </>
+                          ) : (
+                            <>
+                              <Play className="mr-2 h-4 w-4" />
+                              {t('documents.actions.reprocess')}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                    {/* Secondary Actions Row - Always visible */}
+                    <div className="flex gap-2 w-full">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleExportDocument(doc.id, doc.filename)}
                         title={t('common.export', 'Export as Markdown')}
+                        className="flex-1"
                       >
-                        <Download className="h-4 w-4" />
+                        <Download className="mr-2 h-4 w-4" />
+                        {t('documents.actions.download', 'Download')}
                       </Button>
                       <Button
-                        variant="destructive"
+                        variant="outline"
                         size="sm"
                         onClick={() => openDeleteDialog(doc)}
+                        className="flex-1"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {t('documents.actions.delete', 'Delete')}
                       </Button>
                     </div>
                   </CardFooter>
@@ -722,70 +887,6 @@ export function DocumentsPage() {
             >
               {deleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {deleteLoading ? t('documents.delete.deleting') : t('documents.delete.confirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Generate Tree Result Dialog */}
-      <AlertDialog open={generateTreeDialogOpen} onOpenChange={setGenerateTreeDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {generateTreeResult?.success
-                ? t('documents.generateTree.successTitle', 'Categories Generated Successfully')
-                : t('documents.generateTree.errorTitle', 'Generation Failed')}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              {generateTreeResult?.success ? (
-                <>
-                  <div className="flex items-center gap-2 text-success-600 dark:text-success-400">
-                    <CheckCircle2 className="h-5 w-5" />
-                    <span className="font-medium">{generateTreeResult.message}</span>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-neutral-600 dark:text-neutral-400">
-                        {t('documents.generateTree.stats.created', 'Categories Created:')}
-                      </span>
-                      <span className="font-medium text-neutral-900 dark:text-neutral-50">
-                        {generateTreeResult.stats.total_created}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-neutral-600 dark:text-neutral-400">
-                        {t('documents.generateTree.stats.maxDepth', 'Max Depth:')}
-                      </span>
-                      <span className="font-medium text-neutral-900 dark:text-neutral-50">
-                        {generateTreeResult.stats.max_depth}
-                      </span>
-                    </div>
-                    {generateTreeResult.stats.skipped_depth && generateTreeResult.stats.skipped_depth > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-warning-600 dark:text-warning-400">
-                          {t('documents.generateTree.stats.skipped', 'Skipped (too deep):')}
-                        </span>
-                        <span className="font-medium text-warning-700 dark:text-warning-300">
-                          {generateTreeResult.stats.skipped_depth}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-600">
-                    {t('documents.generateTree.viewInCategories', 'View the generated categories in the Categories section of your project.')}
-                  </p>
-                </>
-              ) : (
-                <div className="flex items-center gap-2 text-error-600 dark:text-error-400">
-                  <XCircle className="h-5 w-5" />
-                  <span>{generateTreeResult?.message || t('documents.generateTree.error')}</span>
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setGenerateTreeDialogOpen(false)}>
-              {t('common.close', 'Close')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

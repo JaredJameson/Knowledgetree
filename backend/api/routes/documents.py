@@ -457,9 +457,11 @@ async def stream_document_progress(
                             "message": "Task queued, waiting to start"
                         }
                     elif current_state == 'PROGRESS':
+                        # Get task info and ensure status is "processing"
+                        task_info = task_result.info if task_result.info else {}
                         data = {
-                            "status": "processing",
-                            **task_result.info
+                            **task_info,
+                            "status": "processing"  # Override status to ensure it's "processing"
                         }
                     elif current_state == 'SUCCESS':
                         data = {

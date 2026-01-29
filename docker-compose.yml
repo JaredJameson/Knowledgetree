@@ -62,7 +62,7 @@ services:
       - EMBEDDING_MODEL=BAAI/bge-m3
       - EMBEDDING_DIMENSIONS=1024
       - EMBEDDING_DEVICE=cpu
-      - HF_HOME=/app/models
+      - HF_HOME=/root/.cache/huggingface
 
       # PDF Processing
       - CHUNK_SIZE=1000
@@ -99,7 +99,7 @@ services:
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
-      - bge_models:/app/models
+      - bge_models:/root/.cache/huggingface
     depends_on:
       db:
         condition: service_healthy
@@ -134,7 +134,7 @@ services:
       - EMBEDDING_MODEL=BAAI/bge-m3
       - EMBEDDING_DIMENSIONS=1024
       - EMBEDDING_DEVICE=cpu
-      - HF_HOME=/app/models
+      - HF_HOME=/root/.cache/huggingface
 
       # PDF Processing
       - CHUNK_SIZE=1000
@@ -152,7 +152,7 @@ services:
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
-      - bge_models:/app/models
+      - bge_models:/root/.cache/huggingface
     depends_on:
       db:
         condition: service_healthy

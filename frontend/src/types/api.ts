@@ -197,6 +197,8 @@ export interface Category {
   icon: string;
   depth: number;
   order: number;
+  page_start: number | null;
+  page_end: number | null;
   parent_id: number | null;
   project_id: number;
   created_at: string;

@@ -236,7 +236,7 @@
     },
     "process": {
       "title": "Przetwarzanie dokumentu",
-      "description": "Wyodrębnij tekst, podziel na fragmenty i wygeneruj embeddingi",
+      "description": "Wyodrębnij tekst, podziel na fragmenty i przygotuj do wyszukiwania",
       "start": "Rozpocznij przetwarzanie",
       "processing": "Przetwarzanie...",
       "success": "Dokument przetworzony pomyślnie",
@@ -251,7 +251,7 @@
     "stats": {
       "pages": "Strony",
       "chunks": "Fragmenty",
-      "embeddings": "Embeddingi",
+      "embeddings": "Fragmenty indeksowane",
       "fileSize": "Rozmiar pliku",
       "uploadedAt": "Przesłano",
       "processedAt": "Przetworzono"
@@ -263,6 +263,17 @@
       "download": "Pobierz",
       "delete": "Usuń",
       "generateTree": "Generuj Kategorie"
+    },
+    "progress": {
+      "starting": "Rozpoczynanie przetwarzania...",
+      "step": "Krok",
+      "steps": {
+        "extraction": "Wyodrębnianie tekstu",
+        "chunking": "Podział na fragmenty",
+        "embeddings": "Przygotowywanie do wyszukiwania",
+        "storage": "Zapisywanie",
+        "completed": "Zakończono"
+      }
     },
     "generateTree": {
       "generating": "Generowanie...",
@@ -624,5 +635,24 @@
       "jobId": "Job ID",
       "urlsToProcess": "URLi do przetworzenia"
     }
+  },
+  "documentExplorer": {
+    "title": "Eksplorator Dokumentu",
+    "loading": "Ładowanie dokumentu...",
+    "loadingContent": "Ładowanie zawartości...",
+    "categoryTree": "Drzewo Kategorii",
+    "categoryTreeDescription": "Nawiguj po strukturze dokumentu",
+    "selectCategory": "Wybierz kategorię",
+    "selectCategoryDescription": "Wybierz kategorię aby zobaczyć jej zawartość",
+    "selectCategoryPrompt": "Wybierz kategorię z drzewa aby zobaczyć jej zawartość",
+    "categoryContent": "Zawartość i szczegóły kategorii",
+    "depth": "Poziom",
+    "pages": "Strony",
+    "chunks": "Fragmenty Tekstu",
+    "tables": "Tabele",
+    "formulas": "Wzory",
+    "noChunks": "Brak fragmentów przypisanych do tej kategorii",
+    "noTables": "Brak tabel przypisanych do tej kategorii",
+    "noFormulas": "Brak wzorów przypisanych do tej kategorii"
   }
 }
