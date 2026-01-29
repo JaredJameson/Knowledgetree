@@ -98,7 +98,8 @@ export function AgenticCrawlDialog({ projectId, onSuccess }: AgenticCrawlDialogP
         },
         body: JSON.stringify({
           urls: validUrls,
-          agent_prompt: prompt.trim()
+          agent_prompt: prompt.trim(),
+          project_id: projectId
         })
       });
 

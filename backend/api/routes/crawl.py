@@ -61,6 +61,7 @@ class AgenticCrawlRequest(BaseModel):
     """Request for agentic crawl with custom AI extraction prompt"""
     urls: List[HttpUrl] = Field(..., description="URLs to process (web or YouTube)", min_items=1, max_items=20)
     agent_prompt: str = Field(..., description="Custom natural language prompt for extraction", min_length=10, max_length=1000)
+    project_id: int = Field(..., description="Target project ID for saving results")
     engine: Optional[CrawlEngineRequest] = Field(None, description="Optional: Force specific engine (auto-selected if not provided)")
     category_id: Optional[int] = Field(None, description="Parent category for organization")
 
@@ -310,7 +311,8 @@ async def crawl_with_agent_prompt(
     ```json
     {
         "urls": ["https://example.com", "https://youtube.com/watch?v=xyz"],
-        "agent_prompt": "extract all companies with name, address, contact info"
+        "agent_prompt": "extract all companies with name, address, contact info",
+        "project_id": 1
     }
     ```
 
@@ -328,21 +330,20 @@ async def crawl_with_agent_prompt(
     if len(urls) > 20:
         raise HTTPException(status_code=400, detail="Maximum 20 URLs per agentic crawl")
 
-    # Get user's first project (or create default if none exists)
+    # Verify user has access to the specified project
     result = await db.execute(
-        select(Project).where(Project.owner_id == current_user.id).limit(1)
+        select(Project).where(
+            Project.id == request.project_id,
+            Project.owner_id == current_user.id
+        )
     )
     project = result.scalar_one_or_none()
 
     if not project:
-        # Create default project if user has none
-        project = Project(
-            name="Default Project",
-            description="Auto-created default project",
-            owner_id=current_user.id
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project {request.project_id} not found or access denied"
         )
-        db.add(project)
-        await db.flush()
 
     # Create CrawlJob with agent_prompt
     crawl_job = CrawlJob(
