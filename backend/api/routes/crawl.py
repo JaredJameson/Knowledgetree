@@ -3,7 +3,7 @@ KnowledgeTree - Web Crawler API Routes
 REST API for web crawling functionality
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional, List, Dict, Any
@@ -54,6 +54,24 @@ class BatchCrawlRequest(BaseModel):
     extract_images: bool = Field(False, description="Extract images from page")
     category_id: Optional[int] = Field(None, description="Category ID for saved documents")
     concurrency: int = Field(5, description="Maximum concurrent crawls", ge=1, le=10)
+
+
+class AgenticCrawlRequest(BaseModel):
+    """Request for agentic crawl with custom AI extraction prompt"""
+    urls: List[HttpUrl] = Field(..., description="URLs to process (web or YouTube)", min_items=1, max_items=20)
+    agent_prompt: str = Field(..., description="Custom natural language prompt for extraction", min_length=10, max_length=1000)
+    engine: Optional[CrawlEngineRequest] = Field(None, description="Force specific engine")
+    category_id: Optional[int] = Field(None, description="Parent category for organization")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "urls": ["https://example.com/company-list"],
+                "agent_prompt": "wyciągnij wszystkie firmy z nazwą, adresem, danymi kontaktowymi i stroną internetową",
+                "engine": "http",
+                "category_id": None
+            }
+        }
 
 
 class TestCrawlRequest(BaseModel):
@@ -183,14 +201,14 @@ async def crawl_single_url(
 @router.post("/batch")
 async def crawl_batch_urls(
     request: BatchCrawlRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Crawl multiple URLs in background
+    Crawl multiple URLs in background with Document + Category tree creation
     
-    Creates a background job that crawls all URLs and saves them as documents.
+    Creates separate crawl job for each URL and processes them in Celery workers.
+    Each URL becomes a separate Document with its own Category tree.
     
     **Example:**
     ```json
@@ -202,43 +220,152 @@ async def crawl_batch_urls(
     }
     ```
     """
-    # Create crawl job
-    job = CrawlJob(
-        project_id=current_user.id,
-        urls=[str(url) for url in request.urls],
-        status=CrawlStatus.PENDING.value,
-        total_urls=len(request.urls),
-        completed_urls=0,
-        failed_urls=0,
-        config={
-            "engine": request.engine.value if request.engine else None,
-            "force_engine": request.force_engine,
-            "extract_links": request.extract_links,
-            "extract_images": request.extract_images,
-            "category_id": request.category_id,
-            "concurrency": request.concurrency
-        }
-    )
-    db.add(job)
-    await db.commit()
-    await db.refresh(job)
+    from services.document_tasks import process_web_crawl_task
+    from models.crawl_job import ScheduleFrequency
     
-    # Add background task
-    background_tasks.add_task(
-        execute_batch_crawl,
-        job_id=job.id,
-        urls=[str(url) for url in request.urls],
-        engine=CrawlEngine[request.engine.value] if request.engine else None,
-        force_engine=request.force_engine,
-        category_id=request.category_id,
-        concurrency=request.concurrency
-    )
+    # Parse URLs
+    urls = [str(url) for url in request.urls]
+    
+    if len(urls) > 50:
+        raise HTTPException(status_code=400, detail="Maximum 50 URLs per batch")
+    
+    # Create CrawlJob for each URL
+    job_ids = []
+    created_jobs = []
+    
+    for url in urls:
+        crawl_job = CrawlJob(
+            url=url,
+            status=CrawlStatus.PENDING,
+            schedule_frequency=ScheduleFrequency.ONCE,
+            max_depth=1,  # Single page crawl for now
+            extraction_method=request.engine.value if request.engine else "auto",
+            content_filters={
+                "extract_links": request.extract_links,
+                "extract_images": request.extract_images
+            },
+            project_id=current_user.id
+        )
+        db.add(crawl_job)
+        created_jobs.append(crawl_job)
+    
+    await db.flush()
+    
+    # Launch Celery tasks for each job
+    for crawl_job in created_jobs:
+        # Launch async task with priority based on subscription
+        task = process_web_crawl_task.apply_async(
+            args=[crawl_job.id],
+            kwargs={"max_pages": 1},  # Single page for now
+            queue="workflows",
+            priority=5  # TODO: Map from user subscription tier
+        )
+        job_ids.append(crawl_job.id)
+        
+        # Update job with Celery task ID
+        crawl_job.status = CrawlStatus.IN_PROGRESS
+    
+    await db.commit()
     
     return {
         "success": True,
-        "message": "Batch crawl job created",
-        "job_id": job.id,
-        "total_urls": len(request.urls)
+        "message": f"Created {len(job_ids)} crawl jobs",
+        "job_ids": job_ids,
+        "total_urls": len(urls),
+        "note": "Each URL will be processed as a separate Document with Category tree"
+    }
+
+
+@router.post("/agentic")
+async def crawl_with_agent_prompt(
+    request: AgenticCrawlRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    **Agentic Crawl with Custom AI Extraction Prompt**
+
+    User provides URLs + custom natural language prompt for extraction guidance.
+    AI agents extract structured information according to the prompt.
+    Results organized into knowledge tree and saved to project.
+
+    **Workflow:**
+    1. Content Acquisition: Scrape URLs or transcribe YouTube
+    2. Prompt-Guided Extraction: Use AI with custom instructions
+    3. Knowledge Organization: Build hierarchical tree
+    4. Persistence: Save as Document + Chunks + Categories
+
+    **Example Prompts:**
+    - "wyciągnij wszystkie firmy z nazwą, adresem, danymi kontaktowymi"
+    - "wyciągnij wszystkie informacje odnośnie metodyki konserwacji drewna"
+    - "wejdź na film YouTube, wyciągnij transkrypcję i zbuduj artykuł"
+
+    **Request Body:**
+    ```json
+    {
+        "urls": ["https://example.com", "https://youtube.com/watch?v=xyz"],
+        "agent_prompt": "extract all companies with name, address, contact info, and website",
+        "engine": "http",
+        "category_id": null
+    }
+    ```
+
+    **Returns:**
+    - job_id: CrawlJob ID for tracking
+    - workflow_id: AgentWorkflow ID
+    - message: Status message
+    """
+    from services.document_tasks import process_agentic_crawl_task
+    from models.crawl_job import ScheduleFrequency
+
+    # Parse URLs
+    urls = [str(url) for url in request.urls]
+
+    if len(urls) > 20:
+        raise HTTPException(status_code=400, detail="Maximum 20 URLs per agentic crawl")
+
+    # Create CrawlJob with agent_prompt
+    crawl_job = CrawlJob(
+        url=urls[0],  # Primary URL
+        status=CrawlStatus.PENDING,
+        schedule_frequency=ScheduleFrequency.ONCE,
+        max_depth=1,
+        extraction_method=request.engine.value if request.engine else "auto",
+        content_filters={
+            "urls_count": len(urls),
+            "additional_urls": urls[1:] if len(urls) > 1 else []
+        },
+        agent_prompt=request.agent_prompt,  # Custom extraction prompt
+        project_id=current_user.id
+    )
+    db.add(crawl_job)
+    await db.flush()
+
+    # Launch Celery task for agentic workflow
+    task = process_agentic_crawl_task.apply_async(
+        kwargs={
+            "crawl_job_id": crawl_job.id,
+            "urls": urls,
+            "agent_prompt": request.agent_prompt,
+            "project_id": current_user.id,
+            "engine": request.engine.value if request.engine else None,
+            "category_id": request.category_id
+        },
+        queue="workflows",
+        priority=7  # Higher priority for agentic tasks
+    )
+
+    # Update job status
+    crawl_job.status = CrawlStatus.IN_PROGRESS
+    await db.commit()
+
+    return {
+        "success": True,
+        "job_id": crawl_job.id,
+        "message": f"Agentic extraction started for {len(urls)} URLs with custom prompt",
+        "agent_prompt": request.agent_prompt,
+        "urls_count": len(urls),
+        "note": "AI agents will extract structured information according to your prompt"
     }
 
 
@@ -250,7 +377,7 @@ async def get_crawl_job_status(
 ):
     """
     Get status of a crawl job
-    
+
     Returns current status, progress, and any errors.
     """
     result = await db.execute(
@@ -353,83 +480,6 @@ async def test_crawl(
         error=result.error,
         preview=result.text[:500] if result.text else None
     )
-
-
-# ============================================================================
-# Background Task Functions
-# ============================================================================
-
-
-async def execute_batch_crawl(
-    job_id: int,
-    urls: List[str],
-    engine: Optional[CrawlEngine],
-    force_engine: bool,
-    category_id: Optional[int],
-    concurrency: int
-):
-    """
-    Execute batch crawl in background
-    
-    This function runs as a background task and updates the crawl job status.
-    """
-    from core.database import AsyncSessionLocal
-    
-    orchestrator = CrawlerOrchestrator()
-    
-    async with AsyncSessionLocal() as db:
-        # Get job
-        result = await db.execute(select(CrawlJob).where(CrawlJob.id == job_id))
-        job = result.scalar_one_or_none()
-        
-        if not job:
-            return
-        
-        # Update status to processing
-        job.status = CrawlStatus.PROCESSING.value
-        await db.commit()
-        
-        # Crawl all URLs
-        crawl_results = await orchestrator.batch_crawl(
-            urls=urls,
-            engine=engine,
-            force_engine=force_engine,
-            concurrency=concurrency
-        )
-        
-        # Process results
-        completed = 0
-        failed = 0
-        
-        for crawl_result in crawl_results:
-            if crawl_result.error:
-                failed += 1
-            else:
-                completed += 1
-                
-                # Save as document
-                try:
-                    document = Document(
-                        project_id=job.project_id,
-                        category_id=category_id,
-                        filename=crawl_result.title or crawl_result.url.split('/')[-1],
-                        original_url=crawl_result.url,
-                        status="completed",
-                        content_type="text/html",
-                        file_size=len(crawl_result.text),
-                        page_count=1,
-                        processed_text=crawl_result.text,
-                        metadata={"engine": crawl_result.engine.value}
-                    )
-                    db.add(document)
-                except:
-                    pass
-        
-        # Update job status
-        job.completed_urls = completed
-        job.failed_urls = failed
-        job.status = CrawlStatus.COMPLETED.value if failed == 0 else CrawlStatus.PARTIAL.value
-        await db.commit()
 
 
 # ============================================================================

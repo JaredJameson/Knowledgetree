@@ -100,9 +100,9 @@ Return JSON with this structure:
         )
 
         response = await self.claude.execute_simple(
-            user_query=user_query,
+            prompt=user_query,
             system_prompt=system_prompt,
-            model="claude-3-5-sonnet-20241022"
+            model="claude-sonnet-4-20250514"
         )
 
         try:
@@ -231,9 +231,9 @@ Criteria:
 """
 
         response = await self.claude.execute_simple(
-            user_query=json.dumps(url_data[:20]),  # Limit to 20 for cost
+            prompt=json.dumps(url_data[:20]),  # Limit to 20 for cost
             system_prompt=system_prompt,
-            model="claude-3-5-sonnet-20241022"
+            model="claude-sonnet-4-20250514"
         )
 
         try:
@@ -632,9 +632,9 @@ Focus on entities that are:
 """
 
         response = await self.claude.execute_simple(
-            user_query=text[:8000],  # Limit for API
+            prompt=text[:8000],  # Limit for API
             system_prompt=system_prompt,
-            model="claude-3-5-sonnet-20241022"
+            model="claude-sonnet-4-20250514"
         )
 
         try:
@@ -687,9 +687,9 @@ Extract relationships from the text. Return JSON:
 }}"""
 
         response = await self.claude.execute_simple(
-            user_query=text[:8000],
+            prompt=text[:8000],
             system_prompt=system_prompt,
-            model="claude-3-5-sonnet-20241022"
+            model="claude-sonnet-4-20250514"
         )
 
         try:
@@ -747,9 +747,9 @@ Focus on:
 """
 
         response = await self.claude.execute_simple(
-            user_query=text[:8000],
+            prompt=text[:8000],
             system_prompt=system_prompt,
-            model="claude-3-5-sonnet-20241022"
+            model="claude-sonnet-4-20250514"
         )
 
         try:
@@ -913,9 +913,9 @@ Guidelines:
 """
 
         response = await self.claude.execute_simple(
-            user_query="Design the taxonomy",
+            prompt="Design the taxonomy",
             system_prompt=system_prompt,
-            model="claude-3-5-sonnet-20241022"
+            model="claude-sonnet-4-20250514"
         )
 
         try:
@@ -1136,9 +1136,9 @@ Top Insights:
 """
 
         summary = await self.claude.execute_simple(
-            user_query=summary_input,
+            prompt=summary_input,
             system_prompt=system_prompt,
-            model="claude-3-5-sonnet-20241022"
+            model="claude-sonnet-4-20250514"
         )
 
         await self.log_reasoning(

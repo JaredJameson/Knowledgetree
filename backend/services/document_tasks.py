@@ -7,7 +7,7 @@ import asyncio
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from sqlalchemy import select
 from sqlalchemy.sql import func
 
@@ -15,9 +15,13 @@ from core.celery_app import celery_app
 from core.database import AsyncSessionLocal
 from models.document import Document, ProcessingStatus
 from models.chunk import Chunk
+from models.crawl_job import CrawlJob, CrawlStatus
 from services.pdf_processor import PDFProcessor
 from services.text_chunker import TextChunker
 from services.embedding_generator import EmbeddingGenerator
+from services.web_content_processor import web_content_processor
+from services.agentic_crawl_workflow import agentic_crawl_workflow
+from services.crawler_orchestrator import CrawlEngine
 import logging
 
 logger = logging.getLogger(__name__)
@@ -262,3 +266,410 @@ async def _mark_document_failed(document_id: int, error_message: str):
             document.processing_status = ProcessingStatus.FAILED
             document.error_message = error_message
             await db.commit()
+
+
+
+@celery_app.task(name="services.document_tasks.process_web_crawl_task", bind=True)
+def process_web_crawl_task(self, crawl_job_id: int, max_pages: int = None) -> Dict[str, Any]:
+    """
+    Process a web crawl job in the background
+    
+    Workflow:
+    1. Crawl URL(s) with smart content extraction
+    2. Create Document with source_type=WEB
+    3. Generate URL-based Category tree
+    4. Process content: chunk → embed → store
+    5. Update CrawlJob with results
+    
+    Args:
+        crawl_job_id: ID of CrawlJob to process
+        max_pages: Maximum pages to crawl (None = unlimited)
+        
+    Returns:
+        Processing results with Document ID and statistics
+    """
+    # Run async function in new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        result = loop.run_until_complete(
+            _process_web_crawl_async(self, crawl_job_id, max_pages)
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Web crawl task failed for job {crawl_job_id}: {str(e)}")
+        # Mark crawl job as failed
+        loop.run_until_complete(_mark_crawl_job_failed(crawl_job_id, str(e)))
+        raise
+    finally:
+        loop.close()
+
+
+async def _process_web_crawl_async(task, crawl_job_id: int, max_pages: int = None) -> Dict[str, Any]:
+    """Async implementation of web crawl processing"""
+    async with AsyncSessionLocal() as db:
+        # Get crawl job
+        result = await db.execute(
+            select(CrawlJob).where(CrawlJob.id == crawl_job_id)
+        )
+        crawl_job = result.scalar_one_or_none()
+        
+        if not crawl_job:
+            return {"error": "CrawlJob not found", "crawl_job_id": crawl_job_id}
+        
+        try:
+            # Update status to in_progress
+            crawl_job.status = CrawlStatus.IN_PROGRESS
+            await db.commit()
+            
+            logger.info(f"Starting web crawl: Job {crawl_job_id}, URL: {crawl_job.url}")
+            
+            # Step 1: Initial progress (5%)
+            task.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 1,
+                    'total': 4,
+                    'status': 'Starting web crawl',
+                    'step': 'initialization',
+                    'percentage': 5,
+                    'url': crawl_job.url,
+                    'message': f'Initializing crawl for {crawl_job.url}'
+                }
+            )
+            
+            # Step 2: Process crawl job through web_content_processor (5-60%)
+            task.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 1,
+                    'total': 4,
+                    'status': 'Crawling website',
+                    'step': 'crawling',
+                    'percentage': 10,
+                    'url': crawl_job.url,
+                    'message': f'Crawling {crawl_job.url}...'
+                }
+            )
+            
+            document = await web_content_processor.process_crawl_job(
+                crawl_job=crawl_job,
+                db=db,
+                max_pages=max_pages
+            )
+            
+            logger.info(
+                f"Web crawl {crawl_job_id}: Created Document {document.id} "
+                f"({crawl_job.urls_crawled} URLs crawled, {crawl_job.urls_failed} failed)"
+            )
+            
+            # Step 3: Get statistics from database (60%)
+            task.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 3,
+                    'total': 4,
+                    'status': 'Gathering statistics',
+                    'step': 'statistics',
+                    'percentage': 60,
+                    'document_id': document.id,
+                    'urls_crawled': crawl_job.urls_crawled,
+                    'message': f'Document {document.id} created, gathering statistics...'
+                }
+            )
+            
+            # Count categories created
+            category_result = await db.execute(
+                select(func.count()).select_from(
+                    select(1).where(
+                        Document.id == document.id
+                    ).join(
+                        Document.category
+                    ).subquery()
+                )
+            )
+            categories_count = category_result.scalar() or 0
+            
+            # Count chunks created
+            chunk_result = await db.execute(
+                select(func.count()).select_from(Chunk).where(
+                    Chunk.document_id == document.id
+                )
+            )
+            chunks_count = chunk_result.scalar() or 0
+            
+            # Step 4: Update CrawlJob status to completed (80%)
+            task.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 4,
+                    'total': 4,
+                    'status': 'Finalizing',
+                    'step': 'finalization',
+                    'percentage': 80,
+                    'document_id': document.id,
+                    'categories_count': categories_count,
+                    'chunks_count': chunks_count,
+                    'message': 'Finalizing crawl job...'
+                }
+            )
+            
+            crawl_job.status = CrawlStatus.COMPLETED
+            await db.commit()
+            await db.refresh(crawl_job)
+            
+            # Final progress update (100%)
+            task.update_state(
+                state='SUCCESS',
+                meta={
+                    'current': 4,
+                    'total': 4,
+                    'status': 'Crawl completed',
+                    'step': 'completed',
+                    'percentage': 100,
+                    'document_id': document.id,
+                    'urls_crawled': crawl_job.urls_crawled,
+                    'urls_failed': crawl_job.urls_failed,
+                    'categories_count': categories_count,
+                    'chunks_count': chunks_count,
+                    'message': f'Successfully crawled {crawl_job.urls_crawled} URLs into Document {document.id}'
+                }
+            )
+            
+            logger.info(
+                f"Web crawl {crawl_job_id}: Completed - "
+                f"Document {document.id}, {crawl_job.urls_crawled} URLs, "
+                f"{categories_count} categories, {chunks_count} chunks"
+            )
+            
+            return {
+                "crawl_job_id": crawl_job_id,
+                "document_id": document.id,
+                "status": "completed",
+                "urls_crawled": crawl_job.urls_crawled,
+                "urls_failed": crawl_job.urls_failed,
+                "categories_created": categories_count,
+                "chunks_created": chunks_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Web crawl {crawl_job_id}: Processing failed: {str(e)}")
+            crawl_job.status = CrawlStatus.FAILED
+            crawl_job.error_message = str(e)
+            await db.commit()
+            raise
+
+
+async def _mark_crawl_job_failed(crawl_job_id: int, error_message: str):
+    """Mark crawl job as failed in database"""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(CrawlJob).where(CrawlJob.id == crawl_job_id)
+        )
+        crawl_job = result.scalar_one_or_none()
+
+        if crawl_job:
+            crawl_job.status = CrawlStatus.FAILED
+            crawl_job.error_message = error_message
+            await db.commit()
+
+
+@celery_app.task(name="services.document_tasks.process_agentic_crawl_task", bind=True)
+def process_agentic_crawl_task(
+    self,
+    crawl_job_id: int,
+    urls: List[str],
+    agent_prompt: str,
+    project_id: int,
+    engine: Optional[str] = None,
+    category_id: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Process agentic crawl with custom AI extraction prompt.
+
+    User provides URLs + custom prompt for extraction guidance.
+    AI agents extract structured information according to the prompt.
+    Results organized into knowledge tree and saved to project.
+
+    Workflow:
+    1. Content Acquisition: Scrape URLs or transcribe YouTube
+    2. Prompt-Guided Extraction: Use AI with custom instructions
+    3. Knowledge Organization: Build hierarchical tree
+    4. Persistence: Save as Document + Chunks + Categories
+
+    Args:
+        crawl_job_id: ID of CrawlJob to process
+        urls: List of URLs to process (can include YouTube)
+        agent_prompt: Custom natural language prompt (e.g., "extract all companies with contact info")
+        project_id: Project ID to save results
+        engine: Optional crawl engine ("http", "playwright", "firecrawl")
+        category_id: Optional parent category for organization
+
+    Returns:
+        Processing results with Document ID and extraction statistics
+    """
+    # Run async function in new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        result = loop.run_until_complete(
+            _process_agentic_crawl_async(
+                self, crawl_job_id, urls, agent_prompt, project_id, engine, category_id
+            )
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Agentic crawl task failed for job {crawl_job_id}: {str(e)}")
+        loop.run_until_complete(_mark_crawl_job_failed(crawl_job_id, str(e)))
+        raise
+    finally:
+        loop.close()
+
+
+async def _process_agentic_crawl_async(
+    task,
+    crawl_job_id: int,
+    urls: List[str],
+    agent_prompt: str,
+    project_id: int,
+    engine: Optional[str],
+    category_id: Optional[int]
+):
+    """Async implementation of agentic crawl workflow with progress reporting"""
+    async with AsyncSessionLocal() as db:
+        try:
+            # Get CrawlJob
+            result = await db.execute(
+                select(CrawlJob).where(CrawlJob.id == crawl_job_id)
+            )
+            crawl_job = result.scalar_one_or_none()
+
+            if not crawl_job:
+                raise ValueError(f"CrawlJob {crawl_job_id} not found")
+
+            logger.info(
+                f"Agentic crawl {crawl_job_id}: Starting with prompt '{agent_prompt[:50]}...' "
+                f"for {len(urls)} URLs"
+            )
+
+            # Step 1: Initialize (5%)
+            task.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 1,
+                    'total': 5,
+                    'status': 'Initializing agentic extraction',
+                    'step': 'initialization',
+                    'percentage': 5,
+                    'urls_count': len(urls),
+                    'message': f'Preparing to extract with prompt: {agent_prompt[:50]}...'
+                }
+            )
+
+            # Step 2: Execute agentic workflow (10-80%)
+            task.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 2,
+                    'total': 5,
+                    'status': 'Extracting knowledge with AI',
+                    'step': 'extraction',
+                    'percentage': 10,
+                    'message': 'Processing content with AI agents...'
+                }
+            )
+
+            # Convert engine string to CrawlEngine enum
+            crawl_engine = None
+            if engine:
+                try:
+                    crawl_engine = CrawlEngine(engine)
+                except ValueError:
+                    logger.warning(f"Invalid engine '{engine}', using auto-selection")
+
+            # Execute workflow
+            workflow_result = await agentic_crawl_workflow.execute(
+                db=db,
+                crawl_job_id=crawl_job_id,
+                urls=urls,
+                agent_prompt=agent_prompt,
+                project_id=project_id,
+                engine=crawl_engine,
+                category_id=category_id
+            )
+
+            logger.info(
+                f"Agentic crawl {crawl_job_id}: Completed - "
+                f"Document {workflow_result['document_id']}, "
+                f"{workflow_result['entities_extracted']} entities, "
+                f"{workflow_result['insights_extracted']} insights, "
+                f"{workflow_result['categories_created']} categories"
+            )
+
+            # Step 3: Statistics (80%)
+            task.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 4,
+                    'total': 5,
+                    'status': 'Gathering statistics',
+                    'step': 'statistics',
+                    'percentage': 80,
+                    'document_id': workflow_result['document_id'],
+                    'entities_extracted': workflow_result['entities_extracted'],
+                    'insights_extracted': workflow_result['insights_extracted'],
+                    'message': f"Extracted {workflow_result['entities_extracted']} entities and {workflow_result['insights_extracted']} insights"
+                }
+            )
+
+            # Step 4: Finalization (90%)
+            task.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 5,
+                    'total': 5,
+                    'status': 'Finalizing',
+                    'step': 'finalization',
+                    'percentage': 90,
+                    'document_id': workflow_result['document_id'],
+                    'message': 'Finalizing agentic extraction...'
+                }
+            )
+
+            # Final progress update (100%)
+            task.update_state(
+                state='SUCCESS',
+                meta={
+                    'current': 5,
+                    'total': 5,
+                    'status': 'Extraction completed',
+                    'step': 'completed',
+                    'percentage': 100,
+                    'document_id': workflow_result['document_id'],
+                    'workflow_id': workflow_result['workflow_id'],
+                    'urls_processed': workflow_result['urls_processed'],
+                    'entities_extracted': workflow_result['entities_extracted'],
+                    'insights_extracted': workflow_result['insights_extracted'],
+                    'categories_created': workflow_result['categories_created'],
+                    'chunks_created': workflow_result['chunks_created'],
+                    'message': f"Successfully extracted knowledge from {workflow_result['urls_processed']} URLs with custom prompt"
+                }
+            )
+
+            return {
+                "crawl_job_id": crawl_job_id,
+                "document_id": workflow_result["document_id"],
+                "workflow_id": workflow_result["workflow_id"],
+                "status": "completed",
+                "urls_processed": workflow_result["urls_processed"],
+                "entities_extracted": workflow_result["entities_extracted"],
+                "insights_extracted": workflow_result["insights_extracted"],
+                "categories_created": workflow_result["categories_created"],
+                "chunks_created": workflow_result["chunks_created"]
+            }
+
+        except Exception as e:
+            logger.error(f"Agentic crawl {crawl_job_id}: Processing failed: {str(e)}")
+            raise
