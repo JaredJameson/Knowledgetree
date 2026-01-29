@@ -315,12 +315,12 @@
       "prompt": "Instrukcja ekstrakcji (AI prompt)",
       "promptPlaceholder": "np. \"wyciągnij wszystkie firmy z nazwą, adresem i danymi kontaktowymi\" lub \"znajdź wszystkie informacje o metodykach konserwacji drewna\"",
       "characters": "znaków",
-      "engineInfo": "🤖 System automatycznie wybierze optymalny silnik crawlingu (HTTP, Playwright lub Firecrawl) na podstawie analizy URLi i promptu.",
+      "engineInfo": "System automatycznie wybierze optymalny silnik crawlingu (HTTP, Playwright lub Firecrawl) na podstawie analizy URLi i promptu.",
       "errorNoUrls": "Dodaj przynajmniej jeden URL",
       "errorPromptTooShort": "Prompt musi mieć minimum 10 znaków",
       "start": "Rozpocznij Crawling",
       "processing": "Przetwarzanie...",
-      "success": "✅ Zadanie utworzone! Job ID: {{jobId}}"
+      "success": "Zadanie utworzone! Job ID: {{jobId}}"
     }
   },
   "categories": {

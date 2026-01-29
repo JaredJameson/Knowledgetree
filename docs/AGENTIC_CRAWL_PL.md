@@ -4,7 +4,7 @@
 
 **Agentic Crawl** to zaawansowana funkcja KnowledgeTree, która pozwala na automatyczne pobieranie i ekstrakcję informacji ze stron internetowych z wykorzystaniem sztucznej inteligencji. System automatycznie wybiera optymalny silnik crawlingu na podstawie analizy URLi i zadania.
 
-## 🎯 Kluczowe Funkcjonalności
+## Kluczowe Funkcjonalności
 
 ### 1. **Inteligentny Wybór Silnika**
 
@@ -46,7 +46,7 @@ Użytkownik podaje naturalny prompt w języku polskim lub angielskim, a AI ekstr
 - Automatyczne łączenie wyników w hierarchiczne drzewo kategorii
 - Równoległe przetwarzanie dla lepszej wydajności
 
-## 🚀 Jak Używać
+## Jak Używać
 
 ### Przez Interfejs Webowy
 
@@ -95,7 +95,7 @@ curl -X POST "http://localhost:8765/api/v1/crawl/agentic" \
 }
 ```
 
-## 🔧 Architektura Techniczna
+## Architektura Techniczna
 
 ### Backend (Python/FastAPI)
 
@@ -176,7 +176,7 @@ export function AgenticCrawlDialog({ projectId, onSuccess }: AgenticCrawlDialogP
 }
 ```
 
-## 📊 Przepływ Danych
+## Przepływ Danych
 
 ```
 ┌─────────────────┐
@@ -232,7 +232,7 @@ export function AgenticCrawlDialog({ projectId, onSuccess }: AgenticCrawlDialogP
 └─────────────────┘
 ```
 
-## 🎓 Przykłady Użycia
+## Przykłady Użycia
 
 ### Przykład 1: Ekstrakcja Firm z Katalogu
 
@@ -307,7 +307,7 @@ Struktura: wstęp, główne tematy, podsumowanie.
 - YouTube transcriber API
 - AI summary według promptu
 
-## ⚙️ Konfiguracja
+## Konfiguracja
 
 ### Zmienne Środowiskowe
 
@@ -328,7 +328,7 @@ PROMPT_MAX_LENGTH = 1000            # Max prompt characters
 CELERY_TASK_PRIORITY = 7            # Higher priority for agentic tasks
 ```
 
-## 🔍 Monitorowanie i Debugowanie
+## Monitorowanie i Debugowanie
 
 ### Sprawdzanie Statusu Zadania
 
@@ -367,7 +367,7 @@ docker logs knowledgetree-celery-worker -f | grep -E "crawl|engine|agentic"
 [2026-01-29 12:05:03] INFO: Extracting with custom prompt: wyciągnij wszystkie...
 ```
 
-## 🚨 Obsługa Błędów
+## Obsługa Błędów
 
 ### Typowe Błędy i Rozwiązania
 
@@ -387,7 +387,7 @@ docker logs knowledgetree-celery-worker -f | grep -E "crawl|engine|agentic"
 - Update do najnowszej wersji
 - Fix: używamy `asyncio.run()` zamiast `new_event_loop()`
 
-## 📈 Wydajność
+## Wydajność
 
 ### Benchmarki
 
@@ -404,26 +404,26 @@ docker logs knowledgetree-celery-worker -f | grep -E "crawl|engine|agentic"
 - **Caching**: Ponowne zapytania wykorzystują cache
 - **Inteligentny fallback**: Automatyczne przełączanie silników przy błędach
 
-## 🔐 Bezpieczeństwo
+## Bezpieczeństwo
 
 - **Autentykacja**: Bearer token wymagany
 - **Rate limiting**: Zapobieganie nadużyciom
 - **URL validation**: Walidacja formatów i domen
 - **Sandbox execution**: Izolowane środowisko crawlingu
 
-## 📝 Changelog
+## Changelog
 
 ### v1.1.0 (2026-01-29)
-- ✨ Dodano inteligentny wybór silnika
-- ✨ Agentic crawl z custom AI prompts
-- 🐛 Fix: Event loop error w Celery tasks
-- 📚 Dokumentacja w języku polskim
+- Dodano inteligentny wybór silnika
+- Agentic crawl z custom AI prompts
+- Fix: Event loop error w Celery tasks
+- Dokumentacja w języku polskim
 
 ### v1.0.0 (2026-01-20)
-- 🎉 Podstawowy crawling HTTP/Playwright
-- 🎉 Single URL i batch crawling
+- Podstawowy crawling HTTP/Playwright
+- Single URL i batch crawling
 
-## 🤝 Wsparcie
+## Wsparcie
 
 - **GitHub Issues**: https://github.com/yourusername/knowledgetree/issues
 - **Dokumentacja API**: http://localhost:8765/docs
@@ -431,4 +431,4 @@ docker logs knowledgetree-celery-worker -f | grep -E "crawl|engine|agentic"
 
 ---
 
-**Stworzone z ❤️ dla KnowledgeTree**
+**Stworzone dla KnowledgeTree**

@@ -237,7 +237,7 @@ export function AgenticCrawlDialog({ projectId, onSuccess }: AgenticCrawlDialogP
             <AlertDescription className="text-xs">
               {t(
                 'documents.agenticCrawl.engineInfo',
-                '🤖 System automatycznie wybierze optymalny silnik crawlingu (HTTP, Playwright lub Firecrawl) na podstawie analizy URLi i promptu.'
+                'System automatycznie wybierze optymalny silnik crawlingu (HTTP, Playwright lub Firecrawl) na podstawie analizy URLi i promptu.'
               )}
             </AlertDescription>
           </Alert>
@@ -255,7 +255,7 @@ export function AgenticCrawlDialog({ projectId, onSuccess }: AgenticCrawlDialogP
             <Alert className="border-green-200 bg-green-50 dark:bg-green-950">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800 dark:text-green-200">
-                {t('documents.agenticCrawl.success', '✅ Zadanie utworzone! Job ID: {{jobId}}', {
+                {t('documents.agenticCrawl.success', 'Zadanie utworzone! Job ID: {{jobId}}', {
                   jobId: result.job_id
                 })}
               </AlertDescription>
