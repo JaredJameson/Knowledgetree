@@ -65,6 +65,7 @@ export interface Document {
   filename: string;
   title: string | null;
   source_type: DocumentType;
+  source_url: string | null;
   file_path: string | null;
   file_size: number | null;
   page_count: number | null;

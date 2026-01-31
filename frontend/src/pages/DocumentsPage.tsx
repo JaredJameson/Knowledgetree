@@ -34,6 +34,7 @@ import {
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AgenticCrawlDialog } from '@/components/AgenticCrawlDialog';
+import { CrawlProgressMonitor } from '@/components/CrawlProgressMonitor';
 import {
   Loader2,
   Upload,
@@ -87,6 +88,9 @@ export function DocumentsPage() {
 
   // Generate tree state
   const [generatingTreeDocId, setGeneratingTreeDocId] = useState<number | null>(null);
+
+  // Crawl progress monitoring state
+  const [activeCrawlJobId, setActiveCrawlJobId] = useState<number | null>(null);
 
   // Load projects on mount
   useEffect(() => {
@@ -664,9 +668,27 @@ export function DocumentsPage() {
                   </div>
                   <AgenticCrawlDialog
                     projectId={selectedProjectId}
-                    onSuccess={() => loadDocuments()}
+                    onSuccess={(jobId: number) => {
+                      setActiveCrawlJobId(jobId);
+                      loadDocuments();
+                    }}
                   />
                 </div>
+
+                {/* Crawl Progress Monitor */}
+                {activeCrawlJobId && (
+                  <CrawlProgressMonitor
+                    jobId={activeCrawlJobId}
+                    onComplete={() => {
+                      setActiveCrawlJobId(null);
+                      loadDocuments();
+                    }}
+                    onError={(error: string) => {
+                      setError(error);
+                      setActiveCrawlJobId(null);
+                    }}
+                  />
+                )}
               </CardContent>
             </Card>
           )}
@@ -699,11 +721,26 @@ export function DocumentsPage() {
               {documents.map((doc) => (
                 <Card key={doc.id}>
                   <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg line-clamp-2">
-                        {doc.filename}
-                      </CardTitle>
-                      {getStatusBadge(doc.processing_status)}
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <CardTitle className="text-lg line-clamp-2 flex-1 min-w-0">
+                          {doc.title || doc.filename}
+                        </CardTitle>
+                        <div className="flex-shrink-0">
+                          {getStatusBadge(doc.processing_status)}
+                        </div>
+                      </div>
+                      {doc.source_url && (
+                        <a
+                          href={doc.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate block"
+                          title={doc.source_url}
+                        >
+                          {doc.source_url}
+                        </a>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">

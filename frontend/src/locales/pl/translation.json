@@ -672,5 +672,38 @@
     "noChunks": "Brak fragmentów przypisanych do tej kategorii",
     "noTables": "Brak tabel przypisanych do tej kategorii",
     "noFormulas": "Brak wzorów przypisanych do tej kategorii"
+  },
+  "crawl": {
+    "starting": "Rozpoczynanie crawlingu...",
+    "pending": "Oczekuje na rozpoczęcie",
+    "in_progress": "Crawling w toku",
+    "completed": "Crawling zakończony",
+    "failed": "Crawling nie powiódł się",
+    "step": "Krok",
+    "errors": {
+      "fetchFailed": "Nie udało się pobrać postępu"
+    },
+    "messages": {
+      "analyzingLinks": "Analizowanie strony w poszukiwaniu linków...",
+      "filteringLinks": "Filtrowanie linków przez AI...",
+      "expandedUrls": "Rozszerzono listę URLi",
+      "acquiringContent": "Pobieranie treści...",
+      "scrapingUrl": "Pobieranie URLa...",
+      "extractingStructured": "Wyodrębnianie strukturalnych danych przez AI...",
+      "generatingInsights": "Generowanie insights przez AI...",
+      "creatingDocument": "Tworzenie dokumentu...",
+      "documentCreated": "Dokument utworzony pomyślnie",
+      "chunkingContent": "Podział treści na fragmenty...",
+      "generatingEmbeddings": "Generowanie embeddingów...",
+      "processingWithAI": "Przetwarzanie treści przez agentów AI...",
+      "preparingExtraction": "Przygotowanie do ekstrakcji...",
+      "extractedKnowledge": "Wyodrębniono wiedzę",
+      "finalizingExtraction": "Finalizowanie ekstrakcji...",
+      "extractionComplete": "Ekstrakcja zakończona pomyślnie",
+      "observingPage": "Obserwowanie strony",
+      "analyzingPage": "AI analizuje stronę",
+      "extractedPage": "Wyodrębniono treść",
+      "browsingPage": "Przeglądanie autonomiczne"
+    }
   }
 }

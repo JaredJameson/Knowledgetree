@@ -162,5 +162,38 @@
         "skipped": "Skipped (too deep):"
       }
     }
+  },
+  "crawl": {
+    "starting": "Starting crawl...",
+    "pending": "Waiting to start",
+    "in_progress": "Crawling in progress",
+    "completed": "Crawling completed",
+    "failed": "Crawling failed",
+    "step": "Step",
+    "errors": {
+      "fetchFailed": "Failed to fetch progress"
+    },
+    "messages": {
+      "analyzingLinks": "Analyzing page for relevant links...",
+      "filteringLinks": "Filtering links with AI...",
+      "expandedUrls": "Expanded URL list",
+      "acquiringContent": "Acquiring content...",
+      "scrapingUrl": "Scraping URL...",
+      "extractingStructured": "Extracting structured data with AI...",
+      "generatingInsights": "Generating insights with AI...",
+      "creatingDocument": "Creating document...",
+      "documentCreated": "Document created successfully",
+      "chunkingContent": "Chunking content...",
+      "generatingEmbeddings": "Generating embeddings...",
+      "processingWithAI": "Processing content with AI agents...",
+      "preparingExtraction": "Preparing extraction...",
+      "extractedKnowledge": "Extracted knowledge",
+      "finalizingExtraction": "Finalizing extraction...",
+      "extractionComplete": "Extraction completed successfully",
+      "observingPage": "Observing page",
+      "analyzingPage": "AI analyzing page",
+      "extractedPage": "Content extracted",
+      "browsingPage": "Autonomous browsing"
+    }
   }
 }

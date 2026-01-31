@@ -3,7 +3,7 @@ KnowledgeTree - Web Crawler API Routes
 REST API for web crawling functionality
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional, List, Dict, Any
@@ -105,6 +105,17 @@ class JobStatusResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     error: Optional[str] = None
+
+
+class CrawlProgressResponse(BaseModel):
+    """Real-time progress response from Celery task"""
+    status: str  # pending, in_progress, completed, failed, unknown
+    progress: int  # 0-100
+    step: Optional[str] = None  # Current step name (e.g., "extraction", "crawling")
+    message: Optional[str] = None  # Detailed status message
+    current: Optional[int] = None  # Current item number
+    total: Optional[int] = None  # Total items
+    error: Optional[str] = None  # Error message if failed
 
 
 # ============================================================================
@@ -376,8 +387,9 @@ async def crawl_with_agent_prompt(
         priority=7  # Higher priority for agentic tasks
     )
 
-    # Update job status
+    # Update job status and save Celery task ID for progress tracking
     crawl_job.status = CrawlStatus.IN_PROGRESS
+    crawl_job.celery_task_id = task.id  # Save task ID for real-time progress monitoring
     await db.commit()
 
     return {
@@ -423,6 +435,101 @@ async def get_crawl_job_status(
         updated_at=job.updated_at,
         error=job.error
     )
+
+
+@router.get("/jobs/{job_id}/progress", response_model=CrawlProgressResponse)
+async def get_crawl_progress(
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get real-time progress from Celery task
+    
+    Returns current progress, step, and status messages for active crawl jobs.
+    Polls Celery AsyncResult to get live progress updates from task.update_state() calls.
+    """
+    from core.celery_app import celery_app
+    
+    # Get CrawlJob with project access check
+    result = await db.execute(
+        select(CrawlJob)
+        .join(Project)
+        .where(
+            CrawlJob.id == job_id,
+            Project.owner_id == current_user.id
+        )
+    )
+    crawl_job = result.scalar_one_or_none()
+    
+    if not crawl_job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Crawl job not found or access denied"
+        )
+    
+    # If no task ID, return basic status from database
+    if not crawl_job.celery_task_id:
+        return CrawlProgressResponse(
+            status=crawl_job.status.value,
+            progress=100 if crawl_job.status == CrawlStatus.COMPLETED else 0,
+            message=f"Job {crawl_job.status.value}"
+        )
+    
+    # Get Celery task status
+    task = celery_app.AsyncResult(crawl_job.celery_task_id)
+    
+    if task.state == 'PROGRESS':
+        # Task is actively running with progress updates
+        info = task.info or {}
+        return CrawlProgressResponse(
+            status="in_progress",
+            progress=info.get('percentage', 0),
+            step=info.get('step'),
+            message=info.get('message'),
+            current=info.get('current'),
+            total=info.get('total')
+        )
+    
+    elif task.state == 'SUCCESS':
+        # Task completed successfully
+        return CrawlProgressResponse(
+            status="completed",
+            progress=100,
+            message="Crawling completed successfully"
+        )
+    
+    elif task.state == 'FAILURE':
+        # Task failed with exception
+        return CrawlProgressResponse(
+            status="failed",
+            progress=0,
+            error=str(task.info) if task.info else "Task failed"
+        )
+    
+    elif task.state == 'PENDING':
+        # Task not started yet OR result expired from Redis
+        # Disambiguate using CrawlJob status
+        if crawl_job.status == CrawlStatus.COMPLETED:
+            return CrawlProgressResponse(
+                status="completed",
+                progress=100,
+                message="Crawling completed (result expired from cache)"
+            )
+        else:
+            return CrawlProgressResponse(
+                status="pending",
+                progress=0,
+                message="Waiting to start..."
+            )
+    
+    else:
+        # Unknown state
+        return CrawlProgressResponse(
+            status=task.state.lower(),
+            progress=0,
+            message=f"Task state: {task.state}"
+        )
 
 
 @router.get("/jobs", response_model=List[JobStatusResponse])

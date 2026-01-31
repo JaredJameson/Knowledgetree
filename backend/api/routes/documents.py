@@ -692,16 +692,22 @@ async def generate_category_tree_from_toc(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Generate category tree from PDF Table of Contents
+    Generate category tree from document content
 
-    This endpoint:
-    1. Extracts ToC from the PDF document using hybrid waterfall (pypdf → PyMuPDF → Docling)
+    This endpoint supports two workflows:
+
+    **PDF documents**:
+    1. Extracts ToC from PDF using hybrid waterfall (pypdf → PyMuPDF → Docling)
     2. Converts ToC entries to Category tree structure
-    3. Inserts categories into database with proper hierarchy
-    4. Optionally assigns document to root category
+    3. Inserts categories with proper hierarchy
+
+    **WEB documents (from agentic crawl)**:
+    1. Extracts entities and insights from chunks
+    2. Groups by entity_type and importance
+    3. Creates structured category tree
 
     Args:
-        document_id: Document ID to extract ToC from
+        document_id: Document ID to generate tree from
         request: Generation options (parent_id, validate_depth, auto_assign_document)
 
     Returns:
@@ -709,7 +715,7 @@ async def generate_category_tree_from_toc(
 
     Raises:
         404: Document not found or access denied
-        400: Document not processed yet, or ToC extraction failed
+        400: No structured data found or extraction failed
         500: Tree generation failed
     """
     # Get document with access control
@@ -729,11 +735,48 @@ async def generate_category_tree_from_toc(
             detail="Document not found or access denied"
         )
 
-    # Verify document is PDF
+    # Branch: WEB documents (agentic crawl with entities/insights)
+    if document.source_type == DocumentType.WEB:
+        try:
+            logger.info(f"Generating tree from web crawl data for document {document_id}")
+            from services.web_tree_generator import generate_tree_from_web_crawl
+
+            categories, stats = await generate_tree_from_web_crawl(
+                document_id=document_id,
+                project_id=document.project_id,
+                db=db,
+                parent_id=request.parent_id
+            )
+
+            # Convert Category models to CategoryResponse schemas
+            from schemas.category import CategoryResponse
+            category_responses = [
+                CategoryResponse.model_validate(cat) for cat in categories
+            ]
+
+            return GenerateTreeResponse(
+                success=True,
+                message=f"Generated tree from {stats['total_entities']} entities and {stats['total_insights']} insights",
+                categories=category_responses,
+                stats=stats
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate tree from web crawl: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Tree generation failed: {str(e)}"
+            )
+
+    # Branch: PDF documents (ToC extraction)
     if document.source_type != DocumentType.PDF:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only PDF documents support ToC extraction"
+            detail=f"Document type {document.source_type.value} not supported for tree generation"
         )
 
     # Verify file exists

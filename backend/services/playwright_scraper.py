@@ -23,6 +23,9 @@ class ScrapeResult:
     status_code: int
     quality_score: float = 0.0  # 0.0-1.0
     extraction_method: str = "basic"  # trafilatura | readability | basic
+    screenshot: Optional[bytes] = None  # Full-page screenshot for vision
+    has_visual_elements: bool = False  # Charts, tables, diagrams detected
+    visual_element_count: int = 0  # Number of visual elements found
     error: Optional[str] = None
 
 
@@ -56,7 +59,8 @@ class PlaywrightScraper:
         wait_for_selector: Optional[str] = None,
         wait_for_timeout: int = 5000,
         extract_links: bool = True,
-        extract_images: bool = False
+        extract_images: bool = False,
+        capture_screenshot: bool = False
     ) -> ScrapeResult:
         """
         Scrape a URL using Playwright
@@ -107,6 +111,9 @@ class PlaywrightScraper:
                         links=[],
                         images=[],
                         status_code=0,
+                        screenshot=None,
+                        has_visual_elements=False,
+                        visual_element_count=0,
                         error=f"Navigation timeout: {str(e)}"
                     )
                 
@@ -156,9 +163,54 @@ class PlaywrightScraper:
                         });
                         return images;
                     }''')
-                
+
+                # Detect visual elements (charts, tables, diagrams)
+                # This helps AgenticBrowser decide whether to use vision capabilities
+                visual_element_count = await page.evaluate('''() => {
+                    let count = 0;
+
+                    // Canvas elements (charts, graphs, WebGL)
+                    count += document.querySelectorAll('canvas').length;
+
+                    // SVG elements (vector diagrams, charts)
+                    count += document.querySelectorAll('svg[class*="chart"], svg[class*="graph"], svg[class*="diagram"]').length;
+
+                    // Data tables (not layout tables)
+                    const tables = document.querySelectorAll('table');
+                    tables.forEach(table => {
+                        // Skip small tables (likely layout/navigation)
+                        const rows = table.querySelectorAll('tr').length;
+                        const cells = table.querySelectorAll('td, th').length;
+                        if (rows > 2 && cells > 6) {
+                            count++;
+                        }
+                    });
+
+                    // Diagrams and flow charts (common alt text patterns)
+                    const diagramImages = document.querySelectorAll('img[alt*="diagram"], img[alt*="chart"], img[alt*="graph"], img[alt*="flow"], img[alt*="architecture"]');
+                    count += diagramImages.length;
+
+                    // Chart.js, D3.js, Plotly containers (common data viz libraries)
+                    count += document.querySelectorAll('[class*="chartjs"], [class*="d3-"], [class*="plotly"], [id*="chart"]').length;
+
+                    return count;
+                }''')
+
+                has_visual_elements = visual_element_count > 0
+
+                # Capture screenshot for vision
+                screenshot = None
+                if capture_screenshot:
+                    try:
+                        screenshot = await page.screenshot(full_page=True, type='png')
+                    except Exception as e:
+                        # Log but don't fail if screenshot fails
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Screenshot capture failed: {e}")
+
                 await browser.close()
-                
+
                 return ScrapeResult(
                     url=result_url,
                     title=title or "",
@@ -168,7 +220,10 @@ class PlaywrightScraper:
                     images=images,
                     status_code=200,
                     quality_score=quality_score,
-                    extraction_method=extraction_method
+                    extraction_method=extraction_method,
+                    screenshot=screenshot,
+                    has_visual_elements=has_visual_elements,
+                    visual_element_count=visual_element_count
                 )
         
         except Exception as e:
@@ -180,6 +235,9 @@ class PlaywrightScraper:
                 links=[],
                 images=[],
                 status_code=0,
+                screenshot=None,
+                has_visual_elements=False,
+                visual_element_count=0,
                 error=f"Playwright error: {str(e)}"
             )
     

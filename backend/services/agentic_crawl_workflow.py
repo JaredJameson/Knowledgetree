@@ -7,7 +7,9 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
+from urllib.parse import urlparse
 import json
+import logging
 
 from models.crawl_job import CrawlJob, CrawlStatus
 from models.document import Document, DocumentType, ProcessingStatus
@@ -20,6 +22,7 @@ from services.text_chunker import TextChunker
 from services.embedding_generator import EmbeddingGenerator
 from services.crawler_orchestrator import CrawlEngine
 from services.intelligent_crawler_selector import IntelligentCrawlerSelector
+from services.agentic_browser import AgenticBrowser
 
 
 class AgenticCrawlWorkflow:
@@ -66,7 +69,8 @@ class AgenticCrawlWorkflow:
         agent_prompt: str,
         project_id: int,
         engine: Optional[CrawlEngine] = None,
-        category_id: Optional[int] = None
+        category_id: Optional[int] = None,
+        task: Optional[Any] = None  # Celery task for real-time progress updates
     ) -> Dict[str, Any]:
         """
         Execute agentic crawl workflow with custom extraction prompt.
@@ -79,6 +83,7 @@ class AgenticCrawlWorkflow:
             project_id: Project ID to save results
             engine: Optional crawl engine (HTTP, Playwright, Firecrawl)
             category_id: Optional parent category for organization
+            task: Optional Celery task for real-time progress reporting
 
         Returns:
             Dict with extraction results and document IDs
@@ -108,36 +113,158 @@ class AgenticCrawlWorkflow:
         await db.commit()
 
         try:
-            # Step 0: Intelligent Engine Selection (if not specified)
-            if engine is None:
-                # Automatically select optimal engine based on URLs and task
-                engine = await self.engine_selector.select_engine(
-                    urls=urls,
-                    agent_prompt=agent_prompt,
-                    use_ai_analysis=True
+            logger = logging.getLogger(__name__)
+            
+            # Decision: Use AgenticBrowser for single URL, traditional scraping for multiple URLs
+            if len(urls) == 1:
+                logger.info(f"🤖 Using AgenticBrowser for autonomous navigation: {urls[0]}")
+                
+                from core.config import settings
+                
+                # Initialize AgenticBrowser with Playwright + Claude
+                agentic_browser = AgenticBrowser(
+                    anthropic_api_key=settings.ANTHROPIC_API_KEY,
+                    max_pages=20,
+                    max_depth=3,
+                    headless=True
                 )
-
-                # Log the selection
+                
+                # Progress callback for workflow logging AND Celery progress
+                async def progress_callback(**kwargs):
+                    """Report agentic browsing progress to workflow logs and Celery task"""
+                    status = kwargs.get('status', 'browsing')
+                    url = kwargs.get('url', '')
+                    pages_visited = kwargs.get('pages_visited', 0)
+                    pages_total = kwargs.get('pages_total', 20)
+                    
+                    # Extract additional details from kwargs
+                    decision = kwargs.get('decision', '')
+                    reasoning = kwargs.get('reasoning', '')
+                    content_length = kwargs.get('content_length', 0)
+                    
+                    # Log to workflow for debugging
+                    await self.analyzer_agent.log_reasoning(
+                        db, agent_workflow.id, f"agentic_{status}",
+                        content=f"AgenticBrowser: {status} - {url}",
+                        reasoning=json.dumps(kwargs)
+                    )
+                    
+                    # Update Celery task state for real-time frontend progress
+                    if task:
+                        # Calculate percentage (10-80% range during browsing)
+                        base_progress = 10
+                        browsing_range = 70  # 10% to 80%
+                        progress_pct = base_progress + int((pages_visited / pages_total) * browsing_range)
+                        
+                        # Build detailed message based on status
+                        if status == 'observing':
+                            message = f'Observing page: {url}'
+                        elif status == 'thinking':
+                            message = f'AI analyzing page ({pages_visited}/{pages_total})'
+                            if decision:
+                                message += f' - Decision: {decision}'
+                        elif status == 'extracted':
+                            entities_count = len(kwargs.get('extracted', {}).get('structured_data', {}).get('entities', []))
+                            message = f'Content extracted from page {pages_visited} ({content_length} chars'
+                            if entities_count > 0:
+                                message += f', {entities_count} entities'
+                            message += ')'
+                        elif status == 'browsing':
+                            message = f'Browsing page: {url}'
+                        else:
+                            message = f'{status}: {url}'
+                        
+                        task.update_state(
+                            state='PROGRESS',
+                            meta={
+                                'current': 2,
+                                'total': 5,
+                                'status': 'Agentic browsing in progress',
+                                'step': 'browsing',
+                                'percentage': progress_pct,
+                                'message': message,
+                                'pages_visited': pages_visited,
+                                'pages_total': pages_total,
+                                'current_url': url,
+                                'decision': decision,
+                                'reasoning': reasoning[:100] if reasoning else ''
+                            }
+                        )
+                
+                # Execute autonomous browsing with observe-think-act loop
+                extracted_contents = await agentic_browser.browse_with_intent(
+                    start_url=urls[0],
+                    user_intent=agent_prompt,
+                    db=db,
+                    workflow_id=agent_workflow.id,
+                    progress_callback=progress_callback
+                )
+                
+                if not extracted_contents:
+                    raise ValueError("AgenticBrowser extracted no content from URL")
+                
+                # Convert AgenticBrowser.ExtractedContent → scraped_content format
+                # This ensures compatibility with downstream _extract_with_prompt()
+                scraped_content = []
+                for content in extracted_contents:
+                    scraped_content.append({
+                        'url': content.url,
+                        'title': content.title,
+                        'text': content.main_content,
+                        'source_type': 'web',
+                        'metadata': {
+                            'engine': 'agentic_browser',
+                            'extraction_method': content.extraction_method,
+                            'entities_count': len(content.structured_data.get('entities', [])),
+                            'insights_count': len(content.structured_data.get('insights', [])),
+                            'timestamp': content.timestamp.isoformat()
+                        }
+                    })
+                
+                stats = agentic_browser.get_statistics()
+                logger.info(
+                    f"✅ AgenticBrowser complete: {stats['pages_visited']} pages visited, "
+                    f"{stats['content_extracted']} content items extracted, "
+                    f"{stats['total_entities']} entities, {stats['total_insights']} insights"
+                )
+                
                 await self.analyzer_agent.log_reasoning(
-                    db, agent_workflow.id, "engine_selection",
-                    content=f"Auto-selected engine: {engine.value}",
-                    reasoning=f"Intelligent selection for: {agent_prompt[:100]}"
+                    db, agent_workflow.id, "agentic_complete",
+                    content=f"Agentic browsing completed successfully",
+                    reasoning=json.dumps(stats)
                 )
-
-                # Update workflow config with selected engine
-                config = json.loads(agent_workflow.config)
-                config["engine"] = engine.value
-                config["engine_auto_selected"] = True
-                agent_workflow.config = json.dumps(config)
-                await db.commit()
-
-            # Step 1: Content Acquisition
-            scraped_content = await self._acquire_content(
-                db, agent_workflow.id, urls, engine
-            )
-
-            if not scraped_content:
-                raise ValueError("No content could be acquired from URLs")
+                
+            else:
+                # Multiple URLs - use traditional scraping (legacy path)
+                logger.info(f"Multiple URLs ({len(urls)}), using traditional scraping...")
+                
+                # Intelligent engine selection if not specified
+                if engine is None:
+                    engine = await self.engine_selector.select_engine(
+                        urls=urls,
+                        agent_prompt=agent_prompt,
+                        use_ai_analysis=True
+                    )
+                    
+                    await self.analyzer_agent.log_reasoning(
+                        db, agent_workflow.id, "engine_selection",
+                        content=f"Auto-selected engine: {engine.value}",
+                        reasoning=f"Intelligent selection for: {agent_prompt[:100]}"
+                    )
+                    
+                    config = json.loads(agent_workflow.config)
+                    config["engine"] = engine.value
+                    config["engine_auto_selected"] = True
+                    agent_workflow.config = json.dumps(config)
+                    await db.commit()
+                
+                # Traditional content acquisition
+                scraped_content = await self._acquire_content(
+                    db, agent_workflow.id, urls, engine
+                )
+                
+                if not scraped_content:
+                    raise ValueError("No content could be acquired from URLs")
 
             # Step 2: Prompt-Guided Extraction
             extraction_results = await self._extract_with_prompt(
@@ -277,6 +404,164 @@ class AgenticCrawlWorkflow:
 
         return scraped_content
 
+    async def _discover_relevant_links(
+        self,
+        db: AsyncSession,
+        workflow_id: int,
+        initial_url: str,
+        scraped_result: Dict[str, Any],
+        agent_prompt: str,
+        max_links: int = 15
+    ) -> List[str]:
+        """
+        Use LLM to analyze links and identify which are relevant to user's goal.
+        
+        This enables intelligent multi-page crawling where the agent:
+        1. Analyzes links from the main page
+        2. Uses the user's prompt to filter relevant links
+        3. Returns URLs that likely contain the desired content
+        
+        Example:
+            User prompt: "wyciągnij wszystkie artykuły i treści z tych artykułów"
+            Main page: anthropic.com/engineering (has links to 15 blog articles)
+            Result: Returns 15 article URLs to crawl
+        
+        Args:
+            initial_url: The main page URL
+            scraped_result: Scrape result with links list
+            agent_prompt: User's extraction prompt
+            max_links: Maximum links to discover (default 15)
+            
+        Returns:
+            List of relevant URLs to crawl (absolute URLs)
+        """
+        from urllib.parse import urljoin, urlparse
+        import anthropic
+        from core.config import settings
+        
+        # Get links from scrape result (scrape_batch returns dict with "links" key directly)
+        raw_links = scraped_result.get("links", [])
+        
+        if not raw_links or len(raw_links) == 0:
+            logger.info(f"No links found on {initial_url}")
+            return []
+        
+        # Normalize URLs (relative → absolute, remove fragments)
+        def normalize_url(link: str) -> Optional[str]:
+            """Convert relative to absolute URL and clean"""
+            try:
+                absolute = urljoin(initial_url, link)
+                parsed = urlparse(absolute)
+                
+                # Remove fragment and optionally query
+                clean = parsed._replace(fragment='')
+                
+                # Same-domain check
+                base_domain = urlparse(initial_url).netloc
+                if parsed.netloc != base_domain:
+                    return None  # Skip external links
+                
+                return clean.geturl()
+            except Exception:
+                return None
+        
+        normalized_links = []
+        seen = set()
+        
+        for link in raw_links[:100]:  # Limit to first 100 for LLM processing
+            clean_url = normalize_url(link)
+            if clean_url and clean_url not in seen and clean_url != initial_url:
+                normalized_links.append(clean_url)
+                seen.add(clean_url)
+        
+        if not normalized_links:
+            logger.info(f"No valid same-domain links found on {initial_url}")
+            return []
+        
+        logger.info(f"Found {len(normalized_links)} unique links on {initial_url}, analyzing with LLM...")
+        
+        # Use Claude to filter relevant links
+        system_prompt = f"""You are a web crawling assistant helping identify relevant URLs.
+
+The user wants to: "{agent_prompt}"
+
+The main page at {initial_url} contains {len(normalized_links)} links.
+
+Your task:
+1. Analyze which links are MOST RELEVANT to the user's goal
+2. Filter out navigation, footer, legal, unrelated pages
+3. Prioritize content pages that match the user's intent
+4. Return ONLY URLs that likely contain the target information
+
+Return a JSON array of relevant URLs (up to {max_links} URLs).
+
+Example:
+User goal: "extract all blog articles and their content"
+Relevant: ["/blog/2024-01-15-ai-agents", "/blog/2024-01-20-tool-use", ...]
+Not relevant: ["/about", "/careers", "/contact", "/privacy", "/terms"]
+
+Return ONLY valid JSON array of strings, no explanation."""
+
+        user_message = f"""Here are the links from {initial_url}:
+
+{chr(10).join(f"{i+1}. {url}" for i, url in enumerate(normalized_links[:50]))}
+
+Return JSON array of the {max_links} most relevant URLs for: "{agent_prompt}"
+"""
+        
+        try:
+            # Call Claude API
+            client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+            
+            response = await client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=2000,
+                temperature=0,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}]
+            )
+            
+            # Parse response
+            content = response.content[0].text
+            
+            # Extract JSON array (handle markdown code blocks)
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+            
+            import json
+            relevant_urls = json.loads(content)
+            
+            # Validate and limit
+            if not isinstance(relevant_urls, list):
+                logger.warning(f"LLM returned non-list: {relevant_urls}")
+                return []
+            
+            validated_urls = []
+            for url in relevant_urls[:max_links]:
+                if isinstance(url, str) and url.startswith('http'):
+                    validated_urls.append(url)
+            
+            logger.info(
+                f"✅ Link Discovery: Found {len(validated_urls)} relevant URLs "
+                f"from {len(normalized_links)} total links"
+            )
+            
+            # Log discovery for debugging
+            await self.analyzer_agent.log_reasoning(
+                db, workflow_id, "link_discovery",
+                content=f"Discovered {len(validated_urls)} relevant links: {validated_urls[:3]}...",
+                reasoning=f"LLM filtered {len(normalized_links)} links → {len(validated_urls)} relevant for: '{agent_prompt[:50]}...'"
+            )
+            
+            return validated_urls
+            
+        except Exception as e:
+            logger.error(f"Link discovery failed: {e}")
+            # Fallback: return first N links if LLM fails
+            return normalized_links[:max_links]
+
     async def _extract_with_prompt(
         self,
         db: AsyncSession,
@@ -382,8 +667,16 @@ Focus on entities that match the user's extraction goal. Include:
             model="claude-sonnet-4-20250514"
         )
 
+        # Clean response - remove markdown code fences if present
+        import re
+        cleaned_response = response.strip()
+        if cleaned_response.startswith("```"):
+            match = re.search(r'```(?:json)?\s*\n(.*?)\n```', cleaned_response, re.DOTALL)
+            if match:
+                cleaned_response = match.group(1)
+
         try:
-            result = json.loads(response)
+            result = json.loads(cleaned_response)
             entities = result.get("entities", [])
 
             await self.analyzer_agent.log_reasoning(
@@ -393,7 +686,19 @@ Focus on entities that match the user's extraction goal. Include:
             )
 
             return entities
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            # Log the raw response for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"JSON decode error in extract_entities: {e}")
+            logger.error(f"Raw Claude response: {response[:500]}")
+            
+            await self.analyzer_agent.log_reasoning(
+                db, workflow_id, "extract_entities_error",
+                content=f"Failed to parse entities JSON for: {url}",
+                reasoning=f"JSONDecodeError: {str(e)}, response preview: {response[:200]}"
+            )
+            
             return []
 
     async def _extract_insights_with_prompt(
@@ -441,8 +746,16 @@ Focus on insights that directly address the user's extraction goal.
             model="claude-sonnet-4-20250514"
         )
 
+        # Clean response - remove markdown code fences if present
+        import re
+        cleaned_response = response.strip()
+        if cleaned_response.startswith("```"):
+            match = re.search(r'```(?:json)?\s*\n(.*?)\n```', cleaned_response, re.DOTALL)
+            if match:
+                cleaned_response = match.group(1)
+
         try:
-            result = json.loads(response)
+            result = json.loads(cleaned_response)
             insights = result.get("insights", [])
 
             await self.analyzer_agent.log_reasoning(
@@ -452,7 +765,19 @@ Focus on insights that directly address the user's extraction goal.
             )
 
             return insights
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            # Log the raw response for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"JSON decode error in extract_insights: {e}")
+            logger.error(f"Raw Claude response: {response[:500]}")
+            
+            await self.analyzer_agent.log_reasoning(
+                db, workflow_id, "extract_insights_error",
+                content=f"Failed to parse insights JSON",
+                reasoning=f"JSONDecodeError: {str(e)}, response preview: {response[:200]}"
+            )
+            
             return []
 
     async def _organize_knowledge(
@@ -507,9 +832,14 @@ Focus on insights that directly address the user's extraction goal.
         source_types = set(content["source_type"] for content in scraped_content)
         doc_type = DocumentType.WEB if "web" in source_types else DocumentType.TEXT
 
-        # Create document title from first URL and prompt
-        first_url = scraped_content[0]["url"] if scraped_content else "Unknown"
-        doc_title = f"{agent_prompt[:50]}... | {first_url}"
+        # Create document title from page title and domain
+        first_content = scraped_content[0] if scraped_content else {}
+        page_title = first_content.get("title", "Untitled")
+        first_url = first_content.get("url", "Unknown")
+
+        # Extract domain for cleaner title
+        domain = urlparse(first_url).netloc if first_url != "Unknown" else ""
+        doc_title = f"{page_title} | {domain}" if domain else page_title
 
         # Create document
         document = Document(
