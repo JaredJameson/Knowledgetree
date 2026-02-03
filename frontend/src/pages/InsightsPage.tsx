@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import jsPDF from 'jspdf';
 import {
   Lightbulb,
   Brain,
@@ -19,8 +19,23 @@ import {
   Target,
   Layers,
   ArrowRight,
-  RefreshCw,
+  Download,
+  FileJson,
+  BarChart3,
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
+  Legend,
+} from 'recharts';
 import { insightsApi, projectsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -36,6 +51,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Project {
   id: number;
@@ -71,7 +87,6 @@ interface ProjectInsight {
 }
 
 export default function InsightsPage() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -226,6 +241,126 @@ export default function InsightsPage() {
     return labels[sentiment as keyof typeof labels] || sentiment;
   };
 
+  const exportToJSON = () => {
+    if (!projectInsights) return;
+
+    const dataStr = JSON.stringify(projectInsights, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `insights_${projectInsights.project_name}_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Sukces',
+      description: 'Eksportowano wnioski do JSON',
+    });
+  };
+
+  const exportToPDF = () => {
+    if (!projectInsights) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+
+    // Title
+    doc.setFontSize(18);
+    doc.text('AI Insights Report', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    doc.setFontSize(14);
+    doc.text(projectInsights.project_name, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    doc.setFontSize(10);
+    doc.text(new Date(projectInsights.generated_at).toLocaleString(), pageWidth / 2, yPos, { align: 'center' });
+    yPos += 15;
+
+    // Executive Summary
+    doc.setFontSize(14);
+    doc.text('Executive Summary', 20, yPos);
+    yPos += 8;
+
+    doc.setFontSize(10);
+    const summaryLines = doc.splitTextToSize(projectInsights.executive_summary, pageWidth - 40);
+    doc.text(summaryLines, 20, yPos);
+    yPos += summaryLines.length * 6 + 10;
+
+    // Key Themes
+    if (projectInsights.key_themes.length > 0) {
+      doc.setFontSize(12);
+      doc.text('Key Themes', 20, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      projectInsights.key_themes.forEach((theme: string) => {
+        doc.text(`• ${theme}`, 25, yPos);
+        yPos += 6;
+      });
+      yPos += 5;
+    }
+
+    // Check if we need a new page
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    // Patterns
+    if (projectInsights.patterns.length > 0) {
+      doc.setFontSize(12);
+      doc.text('Patterns', 20, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      projectInsights.patterns.forEach((pattern: string) => {
+        const lines = doc.splitTextToSize(`• ${pattern}`, pageWidth - 45);
+        doc.text(lines, 25, yPos);
+        yPos += lines.length * 6;
+
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+      });
+      yPos += 5;
+    }
+
+    // Recommendations
+    if (projectInsights.recommendations.length > 0) {
+      if (yPos > 240) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(12);
+      doc.text('Recommendations', 20, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      projectInsights.recommendations.forEach((rec: string) => {
+        const lines = doc.splitTextToSize(`• ${rec}`, pageWidth - 45);
+        doc.text(lines, 25, yPos);
+        yPos += lines.length * 6;
+
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+      });
+    }
+
+    doc.save(`insights_${projectInsights.project_name}_${new Date().toISOString().split('T')[0]}.pdf`);
+
+    toast({
+      title: 'Sukces',
+      description: 'Eksportowano wnioski do PDF',
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -249,18 +384,18 @@ export default function InsightsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6 sm:mb-8">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-            <Brain className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+            <Brain className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">
+            <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-50">
               AI Insights
             </h1>
-            <p className="text-neutral-600 dark:text-neutral-400">
+            <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400">
               Analizuj dokumenty i projekty z pomocą sztucznej inteligencji
             </p>
           </div>
@@ -276,23 +411,33 @@ export default function InsightsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2 flex-wrap">
-            {projects.map((project) => (
-              <Button
-                key={project.id}
-                variant={selectedProject === project.id ? 'default' : 'outline'}
-                onClick={() => setSelectedProject(project.id)}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                {project.name}
-                {project.documents_count !== undefined && (
-                  <Badge variant="secondary" className="ml-2">
-                    {project.documents_count}
-                  </Badge>
-                )}
-              </Button>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex gap-2 flex-wrap">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-9 w-32" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex gap-2 flex-wrap">
+              {projects.map((project) => (
+                <Button
+                  key={project.id}
+                  variant={selectedProject === project.id ? 'default' : 'outline'}
+                  onClick={() => setSelectedProject(project.id)}
+                  className="text-sm sm:text-base"
+                  size="sm"
+                >
+                  <FileText className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="truncate max-w-[150px] sm:max-w-none">{project.name}</span>
+                  {project.documents_count !== undefined && (
+                    <Badge variant="secondary" className="ml-1 sm:ml-2">
+                      {project.documents_count}
+                    </Badge>
+                  )}
+                </Button>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -365,10 +510,74 @@ export default function InsightsPage() {
                 )}
               </Button>
 
-              {/* Results */}
-              {projectInsights && (
+              {/* Loading State */}
+              {generatingProject && (
                 <>
                   <Separator />
+                  <div className="space-y-6 pt-4">
+                    {/* Executive Summary Skeleton */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-48" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+
+                    {/* Key Themes Skeleton */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-36" />
+                      <div className="flex flex-wrap gap-2">
+                        <Skeleton className="h-8 w-24" />
+                        <Skeleton className="h-8 w-32" />
+                        <Skeleton className="h-8 w-28" />
+                        <Skeleton className="h-8 w-36" />
+                      </div>
+                    </div>
+
+                    {/* Chart Skeleton */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-32" />
+                      <Skeleton className="h-[250px] w-full" />
+                    </div>
+
+                    {/* Patterns Skeleton */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-40" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-5/6" />
+                      <Skeleton className="h-4 w-4/6" />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Results */}
+              {projectInsights && !generatingProject && (
+                <>
+                  <Separator />
+
+                  {/* Export buttons */}
+                  <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportToJSON}
+                      className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <FileJson className="h-4 w-4" />
+                      <span className="sm:inline">Eksportuj JSON</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportToPDF}
+                      className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="sm:inline">Eksportuj PDF</span>
+                    </Button>
+                  </div>
+
                   <div className="space-y-6">
                     {/* Executive Summary */}
                     <div>
@@ -388,12 +597,25 @@ export default function InsightsPage() {
                           <Layers className="h-5 w-5 text-blue-500" />
                           Główne tematy
                         </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {projectInsights.key_themes.map((theme, i) => (
-                            <Badge key={i} variant="secondary" className="px-3 py-1">
-                              {theme}
-                            </Badge>
-                          ))}
+                        <div className="flex flex-wrap gap-3 items-center">
+                          {projectInsights.key_themes.map((theme, i) => {
+                            // Vary size based on order (first = most important)
+                            const sizeClass = i === 0 ? 'text-lg px-4 py-2' :
+                                            i === 1 ? 'text-base px-3 py-1.5' :
+                                            'text-sm px-3 py-1';
+                            const colorClass = i === 0 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                              i === 1 ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' :
+                                              'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300';
+                            return (
+                              <Badge
+                                key={i}
+                                variant="secondary"
+                                className={`${sizeClass} ${colorClass} font-medium`}
+                              >
+                                {theme}
+                              </Badge>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -402,19 +624,43 @@ export default function InsightsPage() {
                     {projectInsights.top_categories.length > 0 && (
                       <div>
                         <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                          <FolderTree className="h-5 w-5 text-green-500" />
+                          <BarChart3 className="h-5 w-5 text-green-500" />
                           Top kategorie
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {projectInsights.top_categories.map((cat, i) => (
-                            <Card key={i} className="p-3">
-                              <p className="font-medium">{cat.name}</p>
-                              <p className="text-sm text-neutral-500">
-                                {cat.documents} dokumentów
-                              </p>
-                            </Card>
-                          ))}
-                        </div>
+                        <Card className="p-2 sm:p-4">
+                          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+                            <BarChart
+                              data={projectInsights.top_categories}
+                              margin={{ top: 10, right: 10, left: 0, bottom: 60 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-neutral-200 dark:stroke-neutral-700" />
+                              <XAxis
+                                dataKey="name"
+                                angle={-45}
+                                textAnchor="end"
+                                height={80}
+                                className="text-xs fill-neutral-600 dark:fill-neutral-400"
+                              />
+                              <YAxis className="text-xs fill-neutral-600 dark:fill-neutral-400" />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'var(--background)',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: '6px',
+                                }}
+                                labelStyle={{ color: 'var(--foreground)' }}
+                              />
+                              <Bar dataKey="documents" name="Dokumenty" radius={[8, 8, 0, 0]}>
+                                {projectInsights.top_categories.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={`hsl(${(index * 360) / projectInsights.top_categories.length}, 70%, 50%)`}
+                                  />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </Card>
                       </div>
                     )}
 
@@ -457,6 +703,57 @@ export default function InsightsPage() {
                         </ul>
                       </div>
                     )}
+
+                    {/* Sentiment Distribution */}
+                    {projectInsights.document_summaries.length > 0 && (() => {
+                      const sentimentCounts = projectInsights.document_summaries.reduce((acc, doc) => {
+                        acc[doc.sentiment] = (acc[doc.sentiment] || 0) + 1;
+                        return acc;
+                      }, {} as Record<string, number>);
+
+                      const sentimentData = Object.entries(sentimentCounts).map(([sentiment, count]) => ({
+                        name: getSentimentLabel(sentiment),
+                        value: count,
+                        color: sentiment === 'positive' ? '#10b981' : sentiment === 'negative' ? '#ef4444' : '#6b7280',
+                      }));
+
+                      return sentimentData.length > 0 ? (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                            <Target className="h-5 w-5 text-purple-500" />
+                            Analiza sentymentu dokumentów
+                          </h3>
+                          <Card className="p-2 sm:p-4">
+                            <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+                              <PieChart>
+                                <Pie
+                                  data={sentimentData}
+                                  cx="50%"
+                                  cy="50%"
+                                  labelLine={false}
+                                  label={(entry) => `${entry.name}: ${entry.value}`}
+                                  outerRadius={100}
+                                  fill="#8884d8"
+                                  dataKey="value"
+                                >
+                                  {sentimentData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                                <Tooltip
+                                  contentStyle={{
+                                    backgroundColor: 'var(--background)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '6px',
+                                  }}
+                                />
+                                <Legend />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </Card>
+                        </div>
+                      ) : null;
+                    })()}
 
                     {/* Document Summaries */}
                     {projectInsights.document_summaries.length > 0 && (
@@ -516,28 +813,30 @@ export default function InsightsPage() {
                 <label className="text-sm font-medium mb-2 block">
                   ID dokumentu
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="number"
                     placeholder="np. 123"
                     value={selectedDocumentId || ''}
                     onChange={(e) => setSelectedDocumentId(Number(e.target.value))}
                     disabled={generatingDocument}
-                    className="flex-1 px-3 py-2 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900"
+                    className="flex-1 px-3 py-2 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm sm:text-base"
                   />
                   <Button
                     onClick={handleGenerateDocumentInsights}
                     disabled={generatingDocument || !selectedDocumentId}
+                    className="w-full sm:w-auto"
+                    size="default"
                   >
                     {generatingDocument ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generowanie...
+                        <span className="text-sm sm:text-base">Generowanie...</span>
                       </>
                     ) : (
                       <>
                         <Sparkles className="h-4 w-4 mr-2" />
-                        Generuj
+                        <span className="text-sm sm:text-base">Generuj</span>
                       </>
                     )}
                   </Button>
@@ -553,8 +852,48 @@ export default function InsightsPage() {
                 </p>
               </div>
 
+              {/* Document Loading State */}
+              {generatingDocument && (
+                <>
+                  <Separator />
+                  <div className="space-y-4 pt-4">
+                    {/* Title Skeleton */}
+                    <div className="flex items-start justify-between">
+                      <Skeleton className="h-6 w-48" />
+                      <Skeleton className="h-6 w-20" />
+                    </div>
+
+                    {/* Summary Skeleton */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+
+                    {/* Key Findings Skeleton */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-36" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-5/6" />
+                      <Skeleton className="h-4 w-4/6" />
+                    </div>
+
+                    {/* Topics Skeleton */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-24" />
+                      <div className="flex flex-wrap gap-2">
+                        <Skeleton className="h-6 w-20" />
+                        <Skeleton className="h-6 w-24" />
+                        <Skeleton className="h-6 w-28" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* Document Insights Results */}
-              {documentInsights && (
+              {documentInsights && !generatingDocument && (
                 <>
                   <Separator />
                   <div className="space-y-4">

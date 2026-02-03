@@ -16,6 +16,8 @@ import type { Project, Conversation, Message, RetrievedChunk } from '@/types/api
 import type { Artifact } from '@/types/artifact';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import ArtifactPanel from '@/components/ArtifactPanel';
 
 // Extended Message type with sources and artifact for chat display
@@ -57,7 +59,12 @@ import {
   Check,
   Bot,
   User,
-  Sparkles
+  Sparkles,
+  Menu,
+  X,
+  AlertCircle,
+  RefreshCw,
+  Clock
 } from 'lucide-react';
 
 export function ChatPage() {
@@ -81,6 +88,7 @@ export function ChatPage() {
   const [inputMessage, setInputMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [lastFailedMessage, setLastFailedMessage] = useState<string>('');
 
   // Chat settings
   const [useRag, setUseRag] = useState(true);
@@ -97,6 +105,7 @@ export function ChatPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConversation, setDeleteConversation] = useState<Conversation | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Artifact Panel state
   const [artifactPanelOpen, setArtifactPanelOpen] = useState(false);
@@ -184,6 +193,7 @@ export function ChatPage() {
     setSelectedConversationId(null);
     setMessages([]);
     setInputMessage('');
+    setMobileMenuOpen(false);
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -365,6 +375,7 @@ export function ChatPage() {
                 }
               } else if (event.type === 'error') {
                 setError(event.message || t('chat.errors.sendFailed'));
+                setLastFailedMessage(inputMessage.trim());
                 if (agentMode) {
                   setAgentStatus('idle');
                   setAgentProgress('');
@@ -392,6 +403,7 @@ export function ChatPage() {
 
     } catch (err) {
       setError(err instanceof Error ? err.message : t('chat.errors.sendFailed'));
+      setLastFailedMessage(inputMessage.trim());
       // Remove the placeholder assistant message on error
       setMessages(prev => prev.slice(0, -1));
       if (agentMode) {
@@ -478,6 +490,14 @@ export function ChatPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                className="md:hidden"
+                onClick={() => setMobileMenuOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => navigate('/dashboard')}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
@@ -539,11 +559,26 @@ export function ChatPage() {
       ) : (
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar - Conversations */}
-          <div className="w-64 border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 flex flex-col">
-            <div className="p-4 border-b border-neutral-200 dark:border-neutral-800">
+          <div className={`
+            fixed inset-y-0 left-0 z-50 w-64
+            md:relative md:z-0
+            transform transition-transform duration-300 ease-in-out
+            ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+            border-r border-neutral-200 dark:border-neutral-800
+            bg-white dark:bg-neutral-950 flex flex-col
+          `}>
+            <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden flex-shrink-0"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
               <Button
                 onClick={handleNewConversation}
-                className="w-full"
+                className="flex-1"
                 size="sm"
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -553,8 +588,13 @@ export function ChatPage() {
 
             <div className="flex-1 overflow-y-auto p-2">
               {loadingConversations ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="p-3 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  ))}
                 </div>
               ) : conversations.length === 0 ? (
                 <div className="text-center py-8 px-4">
@@ -574,7 +614,10 @@ export function ChatPage() {
                           : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
                         }
                       `}
-                      onClick={() => setSelectedConversationId(conv.id)}
+                      onClick={() => {
+                        setSelectedConversationId(conv.id);
+                        setMobileMenuOpen(false);
+                      }}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -682,6 +725,14 @@ export function ChatPage() {
             </div>
           </div>
 
+          {/* Mobile Menu Backdrop */}
+          {mobileMenuOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+          )}
+
           {/* Main Chat Area */}
           <div className="flex-1 flex flex-col">
             {/* Messages */}
@@ -750,6 +801,23 @@ export function ChatPage() {
                             </ReactMarkdown>
                           )}
                         </div>
+
+                        {/* Timestamp */}
+                        {message.created_at && (
+                          <div className={`flex items-center gap-1 mt-2 text-xs ${
+                            message.role === 'user'
+                              ? 'text-white/70'
+                              : 'text-neutral-500 dark:text-neutral-400'
+                          }`}>
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              {new Date(message.created_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                        )}
 
                         {/* Sources */}
                         {message.sources && message.sources.length > 0 && (
@@ -843,12 +911,11 @@ export function ChatPage() {
                           <Bot className="h-5 w-5 text-white" />
                         </div>
                       </div>
-                      <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 shadow-sm">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm text-neutral-600 dark:text-neutral-400">
-                            {t('chat.messages.thinking')}
-                          </span>
+                      <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 shadow-sm max-w-2xl">
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-5/6" />
+                          <Skeleton className="h-4 w-4/6" />
                         </div>
                       </div>
                     </div>
@@ -861,8 +928,42 @@ export function ChatPage() {
 
             {/* Error Message */}
             {error && (
-              <div className="px-4 py-2 bg-error-50 dark:bg-error-900/20 border-t border-error-200 dark:border-error-800 text-error-700 dark:text-error-400 text-sm">
-                {error}
+              <div className="px-4 py-2 border-t border-neutral-200 dark:border-neutral-800">
+                <Alert variant="destructive" className="relative">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>{t('chat.errors.title', 'Error')}</AlertTitle>
+                  <AlertDescription className="flex items-center justify-between gap-4">
+                    <span>{error}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {lastFailedMessage && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7"
+                          onClick={() => {
+                            setInputMessage(lastFailedMessage);
+                            setError('');
+                            setLastFailedMessage('');
+                          }}
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          {t('chat.actions.retry', 'Retry')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => {
+                          setError('');
+                          setLastFailedMessage('');
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </AlertDescription>
+                </Alert>
               </div>
             )}
 
