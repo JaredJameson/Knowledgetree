@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/context/AuthContext';
 import { projectsApi, exportApi } from '@/lib/api';
 import { downloadBlob } from '@/lib/download';
 import type { Project } from '@/types/api';

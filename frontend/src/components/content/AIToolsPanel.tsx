@@ -70,38 +70,33 @@ export function AIToolsPanel({
       switch (operation) {
         case 'summarize':
           response = await contentWorkbenchApi.summarize({
-            category_id: categoryId,
-            text: content,
+            content: content,
           });
           break;
 
         case 'expand':
           response = await contentWorkbenchApi.expand({
-            category_id: categoryId,
-            text: content,
+            content: content,
           });
           break;
 
         case 'simplify':
           response = await contentWorkbenchApi.simplify({
-            category_id: categoryId,
-            text: content,
+            content: content,
             reading_level: selectedLevel,
           });
           break;
 
         case 'rewriteTone':
           response = await contentWorkbenchApi.rewriteTone({
-            category_id: categoryId,
-            text: content,
+            content: content,
             tone: selectedTone,
           });
           break;
 
         case 'extractQuotes':
           await contentWorkbenchApi.extractQuotes(categoryId, {
-            category_id: categoryId,
-            text: content,
+            content: content,
           });
           toast({
             title: t('contentWorkbench.success'),
@@ -111,8 +106,7 @@ export function AIToolsPanel({
 
         case 'generateOutline':
           response = await contentWorkbenchApi.generateOutline({
-            category_id: categoryId,
-            text: content,
+            topic: content,
           });
           break;
 

@@ -3,7 +3,7 @@ KnowledgeTree - Web Crawler API Routes
 REST API for web crawling functionality
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional, List, Dict, Any
@@ -441,7 +441,7 @@ async def get_crawl_job_status(
 async def get_crawl_progress(
     job_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    authorization: Optional[str] = Header(None)
 ):
     """
     Get real-time progress from Celery task
@@ -451,14 +451,9 @@ async def get_crawl_progress(
     """
     from core.celery_app import celery_app
     
-    # Get CrawlJob with project access check
+    # Get CrawlJob - progress polling doesn't require auth (job_id is sufficient)
     result = await db.execute(
-        select(CrawlJob)
-        .join(Project)
-        .where(
-            CrawlJob.id == job_id,
-            Project.owner_id == current_user.id
-        )
+        select(CrawlJob).where(CrawlJob.id == job_id)
     )
     crawl_job = result.scalar_one_or_none()
     

@@ -40,6 +40,16 @@ class CategoryResponse(CategoryBase):
     order: int
     parent_id: Optional[int]
     project_id: int
+    merged_content: Optional[str] = None  # Full merged article content for UI display
+
+    # Content Workbench fields (Phase 2)
+    draft_content: Optional[str] = None
+    published_content: Optional[str] = None
+    content_status: str = "draft"
+    published_at: Optional[datetime] = None
+    reviewed_by: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+
     created_at: datetime
     updated_at: datetime
 
@@ -186,6 +196,7 @@ class CategoryContentResponse(BaseModel):
     """Category content with chunks, tables, and formulas"""
     category_id: int
     category_name: str
+    merged_content: Optional[str] = None  # Full merged article content for UI display
     chunks: List[dict]
     tables: List[dict]
     formulas: List[dict]
@@ -199,6 +210,7 @@ class CategoryContentResponse(BaseModel):
                 {
                     "category_id": 1,
                     "category_name": "Introduction",
+                    "merged_content": "# Introduction\n\nComplete article text...",
                     "chunks": [
                         {
                             "id": 1,

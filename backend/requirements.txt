@@ -85,6 +85,20 @@ structlog>=23.2.0  # Structured logging
 stripe>=10.0.0
 
 # ============================================================================
+# Knowledge Graph - Phase 3 (Community Detection & Graph Analysis)
+# ============================================================================
+networkx>=3.2
+scikit-learn>=1.3.0
+python-louvain>=0.16  # Louvain community detection
+
+# NER Improvements (Phase 3 Enhancement)
+spacy>=3.8.0  # spaCy NER for better entity detection
+python-Levenshtein>=0.27.0  # Fuzzy string matching for entity deduplication
+# Language models (install separately):
+# python -m spacy download en_core_web_sm
+# python -m spacy download pl_core_news_sm
+
+# ============================================================================
 # Web Crawling (Sprint 6+)
 # ============================================================================
 # HTTP Scraper (primary - fast, free)

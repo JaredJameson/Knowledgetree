@@ -4,8 +4,6 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import {
   Workflow,
   Play,
@@ -18,18 +16,14 @@ import {
   Brain,
   Target,
   Layers,
-  MessageSquare,
-  Settings,
-  FileText,
   Globe,
   Sparkles,
   Eye,
   ThumbsUp,
   ThumbsDown,
   RefreshCw,
-  ArrowRight,
 } from 'lucide-react';
-import { workflowsApi, projectsApi } from '@/lib/api';
+import { workflowsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import {
   Card,
@@ -39,13 +33,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -54,11 +46,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-
-interface Project {
-  id: number;
-  name: string;
-}
 
 interface Workflow {
   id: number;
@@ -85,12 +72,9 @@ interface Workflow {
 }
 
 export default function WorkflowsPage() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   // State
-  const [projects, setProjects] = useState<Project[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,20 +97,6 @@ export default function WorkflowsPage() {
     }, 5000); // Poll every 5 seconds
     return () => clearInterval(interval);
   }, []);
-
-  // Load projects
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  const loadProjects = async () => {
-    try {
-      const response = await projectsApi.list(1, 100);
-      setProjects(response.data.projects || []);
-    } catch (error) {
-      console.error('Failed to load projects:', error);
-    }
-  };
 
   const loadWorkflows = async () => {
     try {

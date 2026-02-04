@@ -6,13 +6,16 @@ import './i18n' // Initialize i18n
 import App from './App.tsx'
 import { ThemeProvider } from './components/theme-provider'
 import { AuthProvider } from './context/AuthContext'
+import { SubscriptionProvider } from './context/SubscriptionContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <ThemeProvider defaultTheme="light" storageKey="knowledgetree-theme">
         <AuthProvider>
-          <App />
+          <SubscriptionProvider>
+            <App />
+          </SubscriptionProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

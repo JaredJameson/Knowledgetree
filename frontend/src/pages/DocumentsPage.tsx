@@ -10,7 +10,7 @@ import { useDropzone } from 'react-dropzone';
 import { useAuth } from '@/context/AuthContext';
 import { projectsApi, documentsApi, exportApi } from '@/lib/api';
 import { downloadBlob } from '@/lib/download';
-import type { Project, Document, ProcessingStatus, GenerateTreeResponse } from '@/types/api';
+import type { Project, Document, ProcessingStatus } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -88,6 +88,9 @@ export function DocumentsPage() {
 
   // Generate tree state
   const [generatingTreeDocId, setGeneratingTreeDocId] = useState<number | null>(null);
+
+  // Clear categories state
+  const [clearingCategoriesDocId, setClearingCategoriesDocId] = useState<number | null>(null);
 
   // Crawl progress monitoring state
   const [activeCrawlJobId, setActiveCrawlJobId] = useState<number | null>(null);
@@ -205,7 +208,7 @@ export function DocumentsPage() {
   };
 
   // Translate backend progress messages to Polish
-  const translateProgressMessage = (message: string, step: string): string => {
+  const translateProgressMessage = (message: string, _step: string): string => {
     // Embeddings generation: "Generated X/Y embeddings (Z%)"
     const embeddingsMatch = message.match(/Generated (\d+)\/(\d+) embeddings \((\d+)%\)/);
     if (embeddingsMatch) {
@@ -429,7 +432,7 @@ export function DocumentsPage() {
       setGeneratingTreeDocId(documentId);
       setError('');
 
-      const response = await documentsApi.generateTree(documentId, {
+      await documentsApi.generateTree(documentId, {
         auto_assign_document: true,
         validate_depth: true,
       });
@@ -440,6 +443,23 @@ export function DocumentsPage() {
       setError(err instanceof Error ? err.message : t('documents.generateTree.error', 'Failed to generate category tree'));
     } finally {
       setGeneratingTreeDocId(null);
+    }
+  };
+
+  // Clear categories for regeneration
+  const handleClearCategories = async (documentId: number) => {
+    try {
+      setClearingCategoriesDocId(documentId);
+      setError('');
+
+      await documentsApi.clearCategories(documentId);
+
+      // Success feedback
+      alert(t('documents.clearCategories.success', 'Categories cleared successfully. You can now regenerate them.'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('documents.clearCategories.error', 'Failed to clear categories'));
+    } finally {
+      setClearingCategoriesDocId(null);
     }
   };
 
@@ -810,15 +830,15 @@ export function DocumentsPage() {
                       </p>
                     </div>
                   </CardContent>
-                  <CardFooter className="flex flex-col gap-2">
+                  <CardFooter className="flex flex-col gap-2 pt-4">
                     {/* Primary Actions Row */}
                     {doc.processing_status === 'pending' && (
-                      <div className="flex gap-2 w-full">
+                      <div className="grid grid-cols-1 gap-2 w-full">
                         <Button
                           size="sm"
                           onClick={() => handleProcess(doc.id)}
                           disabled={processingDocId === doc.id}
-                          className="flex-1"
+                          className="w-full"
                         >
                           {processingDocId === doc.id ? (
                             <>
@@ -835,32 +855,55 @@ export function DocumentsPage() {
                       </div>
                     )}
                     {doc.processing_status === 'completed' && (
-                      <div className="flex gap-2 w-full">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleGenerateTree(doc.id)}
-                          disabled={generatingTreeDocId === doc.id}
-                          className="flex-1"
-                        >
-                          {generatingTreeDocId === doc.id ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              {t('documents.generateTree.generating', 'Generating...')}
-                            </>
-                          ) : (
-                            <>
-                              <FolderTree className="mr-2 h-4 w-4" />
-                              {t('documents.actions.generateTree', 'Generate Categories')}
-                            </>
-                          )}
-                        </Button>
+                      <>
+                        {/* Category Actions - 2 columns */}
+                        <div className="grid grid-cols-2 gap-2 w-full">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleGenerateTree(doc.id)}
+                            disabled={generatingTreeDocId === doc.id}
+                            className="w-full"
+                          >
+                            {generatingTreeDocId === doc.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {t('documents.generateTree.generating', 'Generating...')}
+                              </>
+                            ) : (
+                              <>
+                                <FolderTree className="mr-2 h-4 w-4" />
+                                {t('documents.actions.generateTree', 'Generate Categories')}
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleClearCategories(doc.id)}
+                            disabled={clearingCategoriesDocId === doc.id}
+                            className="w-full"
+                          >
+                            {clearingCategoriesDocId === doc.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {t('documents.clearCategories.clearing', 'Clearing...')}
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                {t('documents.actions.clearCategories', 'Clear Categories')}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        {/* Reprocess Action - Full width */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleProcess(doc.id)}
                           disabled={processingDocId === doc.id}
-                          className="flex-1"
+                          className="w-full"
                         >
                           {processingDocId === doc.id ? (
                             <>
@@ -874,16 +917,16 @@ export function DocumentsPage() {
                             </>
                           )}
                         </Button>
-                      </div>
+                      </>
                     )}
                     {/* Secondary Actions Row - Always visible */}
-                    <div className="flex gap-2 w-full">
+                    <div className="grid grid-cols-2 gap-2 w-full">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleExportDocument(doc.id, doc.filename)}
                         title={t('common.export', 'Export as Markdown')}
-                        className="flex-1"
+                        className="w-full"
                       >
                         <Download className="mr-2 h-4 w-4" />
                         {t('documents.actions.download', 'Download')}
@@ -892,7 +935,7 @@ export function DocumentsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => openDeleteDialog(doc)}
-                        className="flex-1"
+                        className="w-full"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         {t('documents.actions.delete', 'Delete')}

@@ -158,6 +158,7 @@ async def get_category_content(
     return CategoryContentResponse(
         category_id=category_id,
         category_name=category.name,
+        merged_content=category.merged_content,  # Full merged article for UI display
         chunks=[
             {
                 "id": chunk.id,
@@ -199,7 +200,7 @@ async def list_categories(
     project_id: int,
     parent_id: Optional[int] = Query(None, description="Filter by parent category (null for root)"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=100),
+    page_size: int = Query(50, ge=1, le=1000),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):

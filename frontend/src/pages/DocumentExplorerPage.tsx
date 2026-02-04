@@ -15,8 +15,11 @@ import { ArrowLeft, FileText, Table as TableIcon, Calculator, Loader2 } from 'lu
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryTree } from '@/components/CategoryTree';
+import { ContentEditorPanel } from '@/components/content';
 import { documentsApi, categoriesApi } from '@/lib/api';
 import type { Category, Document } from '@/types/api';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export function DocumentExplorerPage() {
   const { documentId } = useParams<{ documentId: string }>();
@@ -29,6 +32,8 @@ export function DocumentExplorerPage() {
   const [categoryContent, setCategoryContent] = useState<any>(null);
   const [loadingContent, setLoadingContent] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editorCategoryId, setEditorCategoryId] = useState<number | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   useEffect(() => {
     if (documentId) {
@@ -74,6 +79,20 @@ export function DocumentExplorerPage() {
 
   const handleBack = () => {
     navigate(-1);
+  };
+
+  const handleCategoryEdit = (category: Category) => {
+    setEditorCategoryId(category.id);
+    setIsEditorOpen(true);
+  };
+
+  const handleEditorClose = () => {
+    setIsEditorOpen(false);
+    setEditorCategoryId(null);
+  };
+
+  const handleOpenFullEditor = (categoryId: number) => {
+    navigate(`/categories/${categoryId}/edit`);
   };
 
   if (loading) {
@@ -123,6 +142,7 @@ export function DocumentExplorerPage() {
               categories={categories}
               selectedCategory={selectedCategory}
               onCategorySelect={handleCategorySelect}
+              onCategoryEdit={handleCategoryEdit}
             />
           </CardContent>
         </Card>
@@ -169,15 +189,27 @@ export function DocumentExplorerPage() {
                   </div>
                 ) : categoryContent ? (
                   <div className="space-y-4">
-                    {/* Chunks */}
+                    {/* Content - Merged or Chunks */}
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <FileText className="h-4 w-4" />
                         <h3 className="font-medium">
-                          {t('documentExplorer.chunks', 'Text Chunks')} ({categoryContent.total_chunks})
+                          {categoryContent.merged_content
+                            ? t('documentExplorer.content', 'Content')
+                            : t('documentExplorer.chunks', 'Text Chunks')} ({categoryContent.total_chunks})
                         </h3>
                       </div>
-                      {categoryContent.chunks && categoryContent.chunks.length > 0 ? (
+                      {/* Show merged content if available (for complete articles) */}
+                      {categoryContent.merged_content ? (
+                        <div className="p-4 bg-muted rounded-md">
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {categoryContent.merged_content}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      ) : categoryContent.chunks && categoryContent.chunks.length > 0 ? (
+                        /* Fallback: Show individual chunks if no merged content */
                         <div className="space-y-3">
                           {categoryContent.chunks.map((chunk: any) => (
                             <div key={chunk.id} className="p-3 bg-muted rounded-md text-sm">
@@ -190,7 +222,7 @@ export function DocumentExplorerPage() {
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">
-                          {t('documentExplorer.noChunks', 'No chunks assigned to this category yet')}
+                          {t('documentExplorer.noContent', 'No content assigned to this category yet')}
                         </div>
                       )}
                     </div>
@@ -273,6 +305,14 @@ export function DocumentExplorerPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Content Editor Panel */}
+      <ContentEditorPanel
+        categoryId={editorCategoryId}
+        isOpen={isEditorOpen}
+        onClose={handleEditorClose}
+        onOpenFullEditor={handleOpenFullEditor}
+      />
     </div>
   );
 }

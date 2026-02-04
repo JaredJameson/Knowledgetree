@@ -1,0 +1,36 @@
+[ERROR] In HTML, %s cannot be a descendant of <%s>.
+This will cause a hydration error.%s <div> p 
+
+  ...
+    <FocusScope asChild={true} loop={true} trapped={true} onMountAutoFocus={undefined} ...>
+      <Primitive.div tabIndex={-1} asChild={true} ref={function} onKeyDown={function}>
+        <Primitive.div.Slot tabIndex={-1} onKeyDown={function} ref={function}>
+          <Primitive.div.SlotClone tabIndex={-1} onKeyDown={function} ref={function}>
+            <DismissableLayer role="dialog" id="radix-_r_0_" aria-describedby="radix-_r_2_" aria-labelledby="radix-_r_1_" ...>
+              <Primitive.div role="dialog" id="radix-_r_0_" aria-describedby="radix-_r_2_" aria-labelledby="radix-_r_1_" ...>
+                <div role="dialog" id="radix-_r_0_" aria-describedby="radix-_r_2_" aria-labelledby="radix-_r_1_" ...>
+                  <DialogClose>
+                  <SheetHeader className="px-6 py-4 ...">
+                    <div className="flex flex-...">
+                      <div className="flex items...">
+                        <div className="flex-1">
+                          <_c7>
+                          <_c9 className="flex items...">
+                            <DialogDescription ref={null} className="text-sm te...">
+                              <Primitive.p id="radix-_r_2_" className="text-sm te..." ref={null}>
+>                               <p
+>                                 id="radix-_r_2_"
+>                                 className="text-sm text-muted-foreground flex items-center gap-2 mt-1"
+>                                 ref={null}
+>                               >
+                                  <Badge variant="secondary">
+>                                   <div
+>                                     className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font..."
+>                                   >
+                        ...
+                      ...
+                  ...
+ @ http://localhost:3555/node_modules/.vite/deps/react-dom_client.js?v=1527c13f:2155
+[ERROR] <%s> cannot contain a nested %s.
+See this log for the ancestor stack trace. p <div> @ http://localhost:3555/node_modules/.vite/deps/react-dom_client.js?v=1527c13f:2162
+[ERROR] Failed to load category: SyntaxError: Unexpected token '<', "<!doctype "... is not valid JSON @ http://localhost:3555/src/components/content/ContentEditorPanel.tsx:53

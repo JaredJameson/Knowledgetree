@@ -24,6 +24,9 @@ from services.crawler_orchestrator import CrawlEngine
 from services.intelligent_crawler_selector import IntelligentCrawlerSelector
 from services.agentic_browser import AgenticBrowser
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 
 class AgenticCrawlWorkflow:
     """
@@ -177,8 +180,8 @@ class AgenticCrawlWorkflow:
                         task.update_state(
                             state='PROGRESS',
                             meta={
-                                'current': 2,
-                                'total': 5,
+                                'current': pages_visited,
+                                'total': pages_total,
                                 'status': 'Agentic browsing in progress',
                                 'step': 'browsing',
                                 'percentage': progress_pct,
@@ -862,61 +865,57 @@ Focus on insights that directly address the user's extraction goal.
         db.add(document)
         await db.flush()
 
-        # Create chunks from extracted insights and entities
+        # Create chunks from actual article content (PRIMARY)
         chunks_created = 0
 
-        # Create chunks from insights (most valuable content)
-        for insight in extraction_results.get("insights", []):
-            chunk_text = f"[INSIGHT] {insight.get('insight', '')}\n\n"
-            chunk_text += f"Category: {insight.get('category', 'N/A')}\n"
-            chunk_text += f"Importance: {insight.get('importance', 'N/A')}\n"
-            chunk_text += f"Evidence: {'; '.join(insight.get('evidence', []))}\n"
-            chunk_text += f"Relevance: {insight.get('relevance_to_goal', '')}"
+        logger.info(f"📝 Creating chunks from {len(scraped_content)} scraped articles...")
 
-            # Generate embedding
-            embedding = self.embedding_generator.generate_embedding(chunk_text)
+        for content_item in scraped_content:
+            article_text = content_item.get('text', '')
+            article_title = content_item.get('title', 'Bez tytułu')
+            article_url = content_item.get('url', '')
 
-            chunk = Chunk(
-                text=chunk_text,
-                embedding=embedding,
-                chunk_index=chunks_created,
-                chunk_metadata=json.dumps({
-                    "type": "insight",
-                    "category": insight.get("category"),
-                    "importance": insight.get("importance")
-                }),
-                document_id=document.id,
-                has_embedding=1
+            if not article_text or len(article_text.strip()) < 100:
+                logger.warning(f"⚠️ Pomijam pusty/krótki content z {article_url}")
+                continue
+
+            # Use text_chunker to split long articles into manageable chunks
+            text_chunks = self.text_chunker.chunk_text(
+                article_text,
+                document.id
             )
 
-            db.add(chunk)
-            chunks_created += 1
+            logger.info(f"📄 Artykuł '{article_title}': podzielony na {len(text_chunks)} fragmentów")
 
-        # Create chunks from entities (structured data)
-        for entity in extraction_results.get("entities", [])[:50]:  # Limit to 50 entities
-            chunk_text = f"[ENTITY] {entity.get('name', '')}\n\n"
-            chunk_text += f"Type: {entity.get('type', 'N/A')}\n"
-            chunk_text += f"Attributes: {json.dumps(entity.get('attributes', {}), ensure_ascii=False)}\n"
-            chunk_text += f"Context: {entity.get('context', '')}\n"
-            chunk_text += f"Relevance: {entity.get('relevance_to_goal', '')}"
+            for chunk_idx, chunk_dict in enumerate(text_chunks):
+                # Extract text from chunk dictionary
+                chunk_text = chunk_dict["text"]
+                # Add title and URL context to each chunk for better searchability
+                full_chunk_text = f"# {article_title}\n\nŹródło: {article_url}\n\n{chunk_text}"
 
-            embedding = self.embedding_generator.generate_embedding(chunk_text)
+                # Generate embedding for semantic search
+                embedding = self.embedding_generator.generate_embedding(full_chunk_text)
 
-            chunk = Chunk(
-                text=chunk_text,
-                embedding=embedding,
-                chunk_index=chunks_created,
-                chunk_metadata=json.dumps({
-                    "type": "entity",
-                    "entity_type": entity.get("type"),
-                    "confidence": entity.get("confidence")
-                }),
-                document_id=document.id,
-                has_embedding=1
-            )
+                chunk = Chunk(
+                    text=full_chunk_text,
+                    embedding=embedding,
+                    chunk_index=chunks_created,
+                    chunk_metadata=json.dumps({
+                        "source_url": article_url,
+                        "article_title": article_title,
+                        "chunk_in_article": chunk_idx,
+                        "total_chunks_in_article": len(text_chunks),
+                        "type": "article_content",
+                        "language": "pl"
+                    }),
+                    document_id=document.id,
+                    has_embedding=1
+                )
 
-            db.add(chunk)
-            chunks_created += 1
+                db.add(chunk)
+                chunks_created += 1
+
+        logger.info(f"✅ Utworzono {chunks_created} fragmentów z treści artykułów")
 
         # Update document status
         document.processing_status = ProcessingStatus.COMPLETED

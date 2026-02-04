@@ -24,7 +24,8 @@
     "next": "Dalej",
     "previous": "Poprzedni",
     "language": "Język",
-    "export": "Eksportuj"
+    "export": "Eksportuj",
+    "retry": "Spróbuj ponownie"
   },
   "auth": {
     "login": {
@@ -157,6 +158,16 @@
         "title": "Czat RAG",
         "description": "Rozmawiaj z AI o swoich dokumentach"
       }
+    },
+    "usage": {
+      "title": "Użycie",
+      "description": "Twoje użycie w bieżącym okresie",
+      "demoDescription": "Nieograniczone użycie w trybie demo",
+      "messages": "Wiadomości",
+      "documents": "Dokumenty",
+      "storage": "Pamięć",
+      "upgrade": "Ulepsz",
+      "limitReached": "Limit osiągnięty"
     },
     "errors": {
       "loadFailed": "Nie udało się załadować statystyk"
@@ -475,6 +486,39 @@
       "allFeatures": "Wszystkie funkcje dostępne",
       "noSubscriptionNeeded": "Subskrypcja nie jest wymagana"
     }
+  },
+  "upgrade": {
+    "title": "Osiągnięto Limit",
+    "description": "Osiągnąłeś limit dla:",
+    "action": "Ulepsz swój plan, aby kontynuować korzystanie z pełnych możliwości.",
+    "button": "Ulepsz Plan",
+    "viewPlans": "Zobacz Plany",
+    "messagesLimit": "Wiadomości",
+    "documentsLimit": "Dokumenty",
+    "storageLimit": "Pamięć"
+  },
+  "account": {
+    "title": "Moje Konto",
+    "subtitle": "Zarządzaj swoim planem i użyciem",
+    "currentPlan": "Aktualny Plan",
+    "features": "Funkcje",
+    "usage": "Użycie",
+    "usageDescription": "Twoje użycie w bieżącym okresie rozliczeniowym",
+    "messages": "Wiadomości",
+    "documents": "Dokumenty",
+    "storage": "Pamięć",
+    "projects": "Projekty",
+    "upgrade": "Ulepsz Plan",
+    "manageBilling": "Zarządzaj Płatnościami",
+    "cancel": "Anuluj Subskrypcję",
+    "cancelConfirm": "Czy na pewno chcesz anulować subskrypcję? Zostanie anulowana na koniec bieżącego okresu rozliczeniowego.",
+    "cancelSuccess": "Subskrypcja zostanie anulowana na koniec bieżącego okresu rozliczeniowego.",
+    "cancelError": "Nie udało się anulować subskrypcji",
+    "billingPortalError": "Nie udało się otworzyć portalu płatności",
+    "limitReached": "Osiągnięto limit",
+    "noData": "Brak danych o subskrypcji",
+    "demoMode": "Tryb Demonstracyjny",
+    "demoModeDescription": "Masz pełny dostęp do wszystkich funkcji bez ograniczeń. Płatności nie są wymagane w trybie demonstracyjnym."
   },
   "subscription": {
     "plans": {
@@ -923,6 +967,35 @@
       "rewriteToneFailed": "Nie udało się zmienić tonu tekstu",
       "extractQuotesFailed": "Nie udało się wyodrębnić cytatów",
       "generateOutlineFailed": "Nie udało się wygenerować zarysu"
+    }
+  },
+  "graph": {
+    "title": "Graf Wiedzy",
+    "description": "Interaktywna wizualizacja powiązań między encjami",
+    "selectProject": "Wybierz projekt",
+    "noProjects": "Brak projektów",
+    "createProjectFirst": "Utwórz projekt aby zobaczyć graf wiedzy",
+    "goToProjects": "Przejdź do projektów",
+    "selectProjectTitle": "Wybierz projekt",
+    "selectProjectDescription": "Wybierz projekt aby zobaczyć jego graf wiedzy",
+    "buildingGraph": "Budowanie grafu wiedzy...",
+    "selectEntity": "Wybierz encję aby zobaczyć szczegóły",
+    "basicInfo": "Podstawowe informacje",
+    "occurrences": "Wystąpienia",
+    "community": "Społeczność",
+    "clustering": "Klasteryzacja",
+    "centralityMetrics": "Metryki centralności",
+    "degree": "Stopień",
+    "betweenness": "Pośrednictwo",
+    "closeness": "Bliskość",
+    "eigenvector": "Wektor własny",
+    "neighbors": "Sąsiedzi",
+    "distance": "Dystans",
+    "hops": "skoków",
+    "moreNeighbors": "więcej sąsiadów",
+    "errors": {
+      "loadGraphFailed": "Nie udało się załadować grafu",
+      "loadEntityDetailsFailed": "Nie udało się załadować szczegółów encji"
     }
   }
 }

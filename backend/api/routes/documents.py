@@ -40,6 +40,7 @@ from services.text_chunker import TextChunker
 from services.embedding_generator import EmbeddingGenerator
 from services.usage_service import usage_service
 from services.category_tree_generator import generate_category_tree
+from services.activity_tracker import ActivityTracker
 from models.chunk import Chunk
 from models.category import Category
 
@@ -157,6 +158,16 @@ async def upload_document(
         )
 
         logger.info(f"Document uploaded: {document.id} - {document.filename}, size: {file_size} bytes ({storage_gb:.2f} GB)")
+
+        # Track activity event
+        activity_tracker = ActivityTracker(db)
+        await activity_tracker.record_document_upload(
+            user_id=current_user.id,
+            project_id=project_id,
+            document_id=document.id,
+            filename=document.filename,
+            size_bytes=file_size
+        )
 
         # Increment rate limit counter
         await increment_rate_limit(
@@ -754,9 +765,17 @@ async def generate_category_tree_from_toc(
                 CategoryResponse.model_validate(cat) for cat in categories
             ]
 
+            # Build message based on what's in stats
+            if 'total_entities' in stats:
+                message = f"Generated tree from {stats['total_entities']} entities and {stats['total_insights']} insights"
+            elif 'articles_found' in stats:
+                message = f"Generated tree from {stats['articles_found']} articles with {stats['chunks_assigned']} chunks"
+            else:
+                message = f"Generated tree with {stats['categories_created']} categories, {stats['chunks_assigned']} chunks assigned"
+            
             return GenerateTreeResponse(
                 success=True,
-                message=f"Generated tree from {stats['total_entities']} entities and {stats['total_insights']} insights",
+                message=message,
                 categories=category_responses,
                 stats=stats
             )
@@ -840,7 +859,16 @@ async def generate_category_tree_from_toc(
             parent_id=request.parent_id
         )
 
-        # Step 4: Optionally assign document to root category
+        # Step 4: Assign chunks to categories and populate merged_content
+        logger.info(f"Assigning chunks to {len(inserted_categories)} PDF categories...")
+        chunk_stats = await _assign_chunks_to_pdf_categories(
+            db=db,
+            document_id=document_id,
+            categories=inserted_categories
+        )
+        stats["chunks_assigned"] = chunk_stats["chunks_assigned"]
+
+        # Step 5: Optionally assign document to root category
         root_category_id = None
         if request.auto_assign_document and inserted_categories:
             # Find root category (depth 0 or first category)
@@ -858,12 +886,15 @@ async def generate_category_tree_from_toc(
 
         logger.info(
             f"✅ Category tree generated: {len(inserted_categories)} categories created, "
-            f"max depth {stats['max_depth']}"
+            f"{stats.get('chunks_assigned', 0)} chunks assigned, max depth {stats['max_depth']}"
         )
 
         return GenerateTreeResponse(
             success=True,
-            message=f"Generated {len(inserted_categories)} categories from ToC",
+            message=(
+                f"Generated {len(inserted_categories)} categories from ToC "
+                f"with {stats.get('chunks_assigned', 0)} chunks assigned"
+            ),
             categories=[CategoryResponse.model_validate(cat) for cat in inserted_categories],
             stats=stats
         )
@@ -876,6 +907,105 @@ async def generate_category_tree_from_toc(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Category tree generation failed: {str(e)}"
+        )
+
+
+@router.delete("/{document_id}/categories")
+async def clear_document_categories(
+    document_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Clear all categories for a document.
+
+    This endpoint deletes all category trees associated with a document,
+    allowing for clean regeneration with updated algorithms.
+
+    Args:
+        document_id: Document ID to clear categories for
+
+    Returns:
+        Success message with count of deleted categories
+
+    Raises:
+        404: Document not found or access denied
+    """
+    # Get document with access control
+    result = await db.execute(
+        select(Document)
+        .join(Project)
+        .where(
+            Document.id == document_id,
+            Project.owner_id == current_user.id
+        )
+    )
+    document = result.scalar_one_or_none()
+
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found or access denied"
+        )
+
+    try:
+        # Get all chunks for this document to clear category assignments
+        chunks_result = await db.execute(
+            select(Chunk).where(Chunk.document_id == document_id)
+        )
+        chunks = chunks_result.scalars().all()
+
+        # Clear category_id from all chunks
+        for chunk in chunks:
+            chunk.category_id = None
+
+        # Find all categories associated with this document's chunks
+        # We need to find root categories that contain chunks from this document
+        categories_result = await db.execute(
+            select(Category)
+            .join(Project)
+            .where(
+                Category.project_id == document.project_id,
+                Project.owner_id == current_user.id
+            )
+        )
+        all_project_categories = categories_result.scalars().all()
+
+        # Find root categories that have chunks from this document
+        from sqlalchemy import delete as sql_delete
+
+        # Get category IDs that have chunks from this document
+        category_ids_with_chunks = set()
+        for chunk in chunks:
+            if hasattr(chunk, '_original_category_id'):
+                category_ids_with_chunks.add(chunk._original_category_id)
+
+        # Alternative: Find categories by checking if they have chunks from this document
+        # This is safer - delete all categories for this project (user can regenerate)
+        root_categories = [cat for cat in all_project_categories if cat.parent_id is None]
+
+        deleted_count = 0
+        for root in root_categories:
+            # Delete root category (CASCADE will delete children)
+            await db.execute(sql_delete(Category).where(Category.id == root.id))
+            deleted_count += 1
+
+        await db.commit()
+
+        logger.info(f"Cleared {deleted_count} root categories for document {document_id}")
+
+        return {
+            "success": True,
+            "message": f"Cleared {deleted_count} category trees for document",
+            "deleted_count": deleted_count
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to clear categories: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear categories: {str(e)}"
         )
 
 
@@ -967,3 +1097,167 @@ async def _insert_categories_hierarchical(
         await _process_entry(entry, parent_id)
 
     return inserted
+
+
+def _find_overlap_length(text1: str, text2: str, max_search: int = 300) -> int:
+    """
+    Find length of overlapping text between end of text1 and start of text2.
+
+    Text chunker creates chunks with 200-char overlap, so consecutive chunks
+    share content that needs to be deduplicated for smooth reading.
+
+    Args:
+        text1: First text (we check its end)
+        text2: Second text (we check its beginning)
+        max_search: Maximum characters to search for overlap
+
+    Returns:
+        Number of characters of overlap (0 if no significant overlap found)
+    """
+    if not text1 or not text2:
+        return 0
+
+    # Search in last max_search chars of text1
+    search_start = max(0, len(text1) - max_search)
+    search_text = text1[search_start:]
+
+    # Try to find longest match, starting from longest possible
+    # Minimum 10 chars to avoid false positives
+    for overlap_len in range(len(search_text), 9, -1):
+        suffix = search_text[-overlap_len:]
+        if text2.startswith(suffix):
+            return overlap_len
+
+    return 0
+
+
+def _merge_pdf_chunks(chunks: list[Chunk]) -> str:
+    """
+    Intelligently merge PDF chunks into coherent text with overlap removal.
+
+    Text chunker creates chunks with ~1000 chars and 200-char overlap.
+    This function detects and removes overlap between consecutive chunks
+    for smooth reading experience.
+
+    Args:
+        chunks: List of Chunk objects
+
+    Returns:
+        Merged content as plain text with smooth reading flow
+    """
+    if not chunks:
+        return ""
+
+    # Sort chunks by index to ensure correct order
+    sorted_chunks = sorted(chunks, key=lambda c: c.chunk_index)
+
+    # Clean chunk texts
+    clean_chunks = [chunk.text.strip() for chunk in sorted_chunks if chunk.text]
+
+    if not clean_chunks:
+        return ""
+
+    # De-overlap and merge chunks intelligently
+    merged_content = clean_chunks[0]
+
+    for i in range(1, len(clean_chunks)):
+        current_chunk = clean_chunks[i]
+
+        # Find overlap between end of merged content and start of current chunk
+        overlap_len = _find_overlap_length(merged_content, current_chunk)
+
+        if overlap_len > 0:
+            # Add only non-overlapping part
+            non_overlapping = current_chunk[overlap_len:]
+            merged_content += non_overlapping
+            logger.debug(f"PDF chunk {i}: removed {overlap_len} chars overlap")
+        else:
+            # No overlap found - add with space to avoid word concatenation
+            merged_content += " " + current_chunk
+            logger.debug(f"PDF chunk {i}: no overlap, added with space")
+
+    return merged_content
+
+
+async def _assign_chunks_to_pdf_categories(
+    db: AsyncSession,
+    document_id: int,
+    categories: list[Category]
+) -> dict:
+    """
+    Assign chunks to PDF categories based on page ranges and populate merged_content.
+
+    For each category with page_start/page_end, find all chunks whose page_number
+    falls within that range, assign them to the category, and merge them into
+    merged_content for UI display.
+
+    Args:
+        db: Database session
+        document_id: Document ID
+        categories: List of inserted Category objects with IDs
+
+    Returns:
+        Statistics dict with chunks_assigned count
+    """
+    # Get all chunks for this document
+    chunks_result = await db.execute(
+        select(Chunk)
+        .where(Chunk.document_id == document_id)
+        .order_by(Chunk.chunk_index)
+    )
+    all_chunks = chunks_result.scalars().all()
+
+    if not all_chunks:
+        logger.warning(f"No chunks found for document {document_id}")
+        return {"chunks_assigned": 0}
+
+    chunks_assigned = 0
+
+    # For each category, find matching chunks by page number
+    for category in categories:
+        if category.page_start is None:
+            continue
+
+        # Find chunks whose page_number falls within category's page range
+        category_chunks = []
+
+        for chunk in all_chunks:
+            # Parse chunk_metadata to get page_number
+            if not chunk.chunk_metadata:
+                continue
+
+            try:
+                metadata = json.loads(chunk.chunk_metadata)
+                page_num = metadata.get("page_number")
+
+                if page_num is None:
+                    continue
+
+                # Check if page falls within range
+                page_end = category.page_end or category.page_start
+                if category.page_start <= page_num <= page_end:
+                    category_chunks.append(chunk)
+
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.warning(f"Failed to parse chunk metadata: {e}")
+                continue
+
+        if category_chunks:
+            # Assign chunks to this category
+            for chunk in category_chunks:
+                chunk.category_id = category.id
+                chunks_assigned += 1
+
+            # Merge chunks and populate merged_content
+            category.merged_content = _merge_pdf_chunks(category_chunks)
+
+            logger.debug(
+                f"Category '{category.name}' (pages {category.page_start}-{category.page_end or category.page_start}): "
+                f"assigned {len(category_chunks)} chunks, merged_content length: {len(category.merged_content)}"
+            )
+
+    await db.flush()
+
+    logger.info(f"Assigned {chunks_assigned} chunks to {len(categories)} PDF categories")
+
+    return {"chunks_assigned": chunks_assigned}

@@ -237,11 +237,13 @@ class AgenticBrowser:
         Ultra-robust JSON extraction from LLM response with extensive fallback strategies.
 
         Handles all common LLM response formats:
-        1. Markdown code blocks (```json or ```)
+        1. Markdown code blocks (```json, ```JSON, ```)
         2. Leading/trailing text and whitespace
         3. JSON embedded in conversational text
-        4. Incomplete or malformed JSON
+        4. Incomplete or malformed JSON with trailing commas
         5. Missing outer braces
+        6. Comments in JSON (// or /* */)
+        7. Single-quoted strings (converts to double-quotes)
 
         Args:
             content: Raw LLM response text
@@ -254,18 +256,40 @@ class AgenticBrowser:
         """
         import re
 
-        # STRATEGY 1: Extract from markdown code blocks
-        if "```json" in content:
+        def clean_json_string(json_str: str) -> str:
+            """Clean common JSON formatting issues"""
+            # Remove trailing commas before closing braces/brackets
+            json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+            # NOTE: NOT removing comments because:
+            # 1. Claude doesn't put comments in JSON
+            # 2. Regex r'//.*?$' would break URLs like "https://example.com"
+            # NOTE: NOT converting single quotes because it breaks apostrophes
+            return json_str.strip()
+
+        # STRATEGY 1: Extract from markdown code blocks with various formats
+        # Try ```json first (most specific)
+        if "```json" in content.lower():
             try:
-                json_str = content.split("```json")[1].split("```")[0].strip()
-                return json.loads(json_str)
+                # Case-insensitive search
+                pattern = r'```json\s*(.*?)\s*```'
+                match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
+                if match:
+                    json_str = clean_json_string(match.group(1))
+                    return json.loads(json_str, strict=False)
             except (IndexError, json.JSONDecodeError):
                 pass  # Try next strategy
 
+        # Try generic ``` blocks
         if "```" in content:
             try:
-                json_str = content.split("```")[1].split("```")[0].strip()
-                return json.loads(json_str)
+                # Extract content between first ``` and second ```
+                pattern = r'```\s*(.*?)\s*```'
+                match = re.search(pattern, content, re.DOTALL)
+                if match:
+                    json_str = clean_json_string(match.group(1))
+                    # Skip if it looks like code (has 'def', 'class', etc.)
+                    if not any(keyword in json_str for keyword in ['def ', 'class ', 'import ', 'function ']):
+                        return json.loads(json_str, strict=False)
             except (IndexError, json.JSONDecodeError):
                 pass  # Try next strategy
 
@@ -277,47 +301,53 @@ class AgenticBrowser:
         if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
             try:
                 json_str = content[first_brace:last_brace + 1]
-                # Clean common formatting issues
-                json_str = json_str.strip()
-                # Remove trailing commas before closing braces/brackets
-                json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
-                return json.loads(json_str)
+                json_str = clean_json_string(json_str)
+                return json.loads(json_str, strict=False)
             except json.JSONDecodeError:
                 pass  # Try next strategy
 
-        # STRATEGY 3: Regex for complete JSON object (non-greedy for nested)
-        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content)
-        if json_match:
-            try:
-                json_str = json_match.group(0).strip()
-                json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
-                return json.loads(json_str)
-            except json.JSONDecodeError:
-                pass  # Try next strategy
-
-        # STRATEGY 4: Greedy regex (DOTALL for multiline)
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            try:
-                json_str = json_match.group(0).strip()
-                json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
-                return json.loads(json_str)
-            except json.JSONDecodeError:
-                pass  # Try next strategy
-
-        # STRATEGY 5: Try parsing entire content (after aggressive cleaning)
+        # STRATEGY 3: Greedy regex for nested JSON (DOTALL for multiline)
+        # This handles deeply nested structures
         try:
-            content = content.strip()
-            # Remove common conversational prefixes
-            content = re.sub(r'^(Here\'s|Here is|My decision|Decision):\s*', '', content, flags=re.IGNORECASE)
-            return json.loads(content)
+            # Match outermost { to outermost }
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                json_str = clean_json_string(json_match.group(0))
+                return json.loads(json_str, strict=False)
         except json.JSONDecodeError:
-            pass  # Final failure
+            pass  # Try next strategy
 
-        # If all strategies failed, raise with helpful message
+        # STRATEGY 4: Try parsing entire content (after aggressive cleaning)
+        try:
+            cleaned_content = content.strip()
+            # Remove common conversational prefixes
+            cleaned_content = re.sub(r'^(Here\'s|Here is|My decision|Decision|Response|Answer):\s*', '', cleaned_content, flags=re.IGNORECASE)
+            cleaned_content = clean_json_string(cleaned_content)
+            return json.loads(cleaned_content)
+        except json.JSONDecodeError:
+            pass  # Try next strategy
+
+        # STRATEGY 5: Try extracting array format [...]
+        # In case LLM returns array instead of object
+        first_bracket = content.find('[')
+        last_bracket = content.rfind(']')
+
+        if first_bracket != -1 and last_bracket != -1 and last_bracket > first_bracket:
+            try:
+                json_str = content[first_bracket:last_bracket + 1]
+                json_str = clean_json_string(json_str)
+                parsed = json.loads(json_str)
+                # Wrap in object if it's an array
+                if isinstance(parsed, list):
+                    return {"items": parsed}
+                return parsed
+            except json.JSONDecodeError:
+                pass  # Final failure
+
+        # If all strategies failed, raise with helpful message and more context
         raise json.JSONDecodeError(
             f"Failed to extract valid JSON from LLM response. "
-            f"Content preview: {content[:300]}...",
+            f"Content preview: {content[:500]}...",
             content,
             0
         )
@@ -405,6 +435,8 @@ class AgenticBrowser:
                     await progress_callback(
                         status="thinking",
                         url=url,
+                        pages_visited=pages_visited + 1,
+                        pages_total=self.max_pages,
                         decision=decision.action,
                         reasoning=decision.reasoning[:100]
                     )
@@ -427,6 +459,8 @@ class AgenticBrowser:
                         await progress_callback(
                             status="extracted",
                             url=url,
+                            pages_visited=pages_visited + 1,
+                            pages_total=self.max_pages,
                             content_length=len(extracted.main_content)
                         )
 
@@ -701,15 +735,15 @@ Decide the next action to fulfill user intent. Return JSON only."""
                 logger.error(f"🚨 Full response: {response}")
                 raise
 
-            # Ultra-aggressive debug logging
-            logger.info(f"🔍 DEBUG: Raw LLM response (first 500 chars): {content[:500]}")
+            # Ultra-aggressive debug logging with repr() to avoid formatting issues
+            logger.info(f"🔍 DEBUG: Raw LLM response (first 500 chars): {repr(content[:500])}")
 
             try:
                 decision_data = self._extract_json_from_llm_response(content)
                 logger.info(f"✅ JSON extraction SUCCESS: {decision_data}")
             except Exception as extract_err:
                 logger.error(f"❌ JSON extraction FAILED: {type(extract_err).__name__}: {extract_err}")
-                logger.error(f"📄 Full raw content: {content}")
+                logger.error(f"📄 Full raw content: {repr(content)}")
                 raise extract_err
 
             return BrowsingDecision(

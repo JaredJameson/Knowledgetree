@@ -16,6 +16,9 @@ from api.routes.insights import router as insights_router
 from api.routes.subscriptions import router as subscriptions_router
 from api.routes.api_keys import router as api_keys_router
 from api.routes.youtube import router as youtube_router
+from api.routes.analytics import router as analytics_router
+from api.routes.content import router as content_router
+from api.routes.graph import router as graph_router
 
 # Import services for initialization
 from services.bm25_service import bm25_service
@@ -120,6 +123,9 @@ app.include_router(insights_router, prefix="/api/v1")
 app.include_router(subscriptions_router, prefix="/api/v1")
 app.include_router(api_keys_router, prefix="/api/v1")
 app.include_router(youtube_router, prefix="/api/v1")
+app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(content_router, prefix="/api/v1")
+app.include_router(graph_router, prefix="/api/v1")
 
 
 if __name__ == "__main__":

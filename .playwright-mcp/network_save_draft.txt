@@ -1,0 +1,5 @@
+[GET] http://localhost:8765/api/v1/auth/me => [200] OK
+[GET] http://localhost:8765/api/v1/auth/me => [200] OK
+[GET] http://localhost:8765/api/v1/categories/654 => [200] OK
+[GET] http://localhost:8765/api/v1/categories/654 => [200] OK
+[POST] http://localhost:8765/api/v1/content/categories/654/draft => [200] OK

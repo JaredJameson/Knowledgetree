@@ -10,15 +10,19 @@
  */
 
 import { useState } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown, Edit } from 'lucide-react';
 import * as Icons from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { Category } from '@/types/api';
 
 interface CategoryTreeProps {
   categories: Category[];
   selectedCategory: Category | null;
   onCategorySelect: (category: Category) => void;
+  onCategoryEdit?: (category: Category) => void;
   className?: string;
 }
 
@@ -27,6 +31,7 @@ interface CategoryNodeProps {
   children: Category[];
   selectedCategory: Category | null;
   onCategorySelect: (category: Category) => void;
+  onCategoryEdit?: (category: Category) => void;
   depth?: number;
 }
 
@@ -35,14 +40,19 @@ function CategoryNode({
   children,
   selectedCategory,
   onCategorySelect,
+  onCategoryEdit,
   depth = 0
 }: CategoryNodeProps) {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = children.length > 0;
   const isSelected = selectedCategory?.id === category.id;
 
   // Get Lucide icon component dynamically
   const IconComponent = (Icons as any)[category.icon || 'Folder'] || Icons.Folder;
+
+  // Get content status from category (with fallback)
+  const contentStatus = (category as any).content_status || 'draft';
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -55,12 +65,19 @@ function CategoryNode({
     onCategorySelect(category);
   };
 
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCategoryEdit) {
+      onCategoryEdit(category);
+    }
+  };
+
   return (
     <div>
       {/* Category row */}
       <div
         className={cn(
-          'flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent transition-colors',
+          'group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent transition-colors',
           isSelected && 'bg-accent font-medium'
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -93,11 +110,32 @@ function CategoryNode({
         {/* Category name */}
         <span className="flex-1 text-sm truncate">{category.name}</span>
 
+        {/* Content status badge */}
+        <Badge
+          variant={contentStatus === 'published' ? 'default' : 'secondary'}
+          className="flex-shrink-0 text-xs"
+        >
+          {t(`contentWorkbench.status.${contentStatus}`)}
+        </Badge>
+
         {/* Page badge */}
         {category.page_start && (
-          <span className="flex-shrink-0 text-xs text-muted-foreground">
+          <span className="flex-shrink-0 text-xs text-muted-foreground ml-2">
             p.{category.page_start}
           </span>
+        )}
+
+        {/* Edit button */}
+        {onCategoryEdit && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-shrink-0 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={handleEdit}
+            title={t('contentWorkbench.openEditor')}
+          >
+            <Edit className="h-3 w-3" />
+          </Button>
         )}
       </div>
 
@@ -111,6 +149,7 @@ function CategoryNode({
               categories={children}
               selectedCategory={selectedCategory}
               onCategorySelect={onCategorySelect}
+              onCategoryEdit={onCategoryEdit}
               depth={depth + 1}
             />
           ))}
@@ -125,12 +164,14 @@ function CategoryTreeNode({
   categories,
   selectedCategory,
   onCategorySelect,
+  onCategoryEdit,
   depth
 }: {
   category: Category;
   categories: Category[];
   selectedCategory: Category | null;
   onCategorySelect: (category: Category) => void;
+  onCategoryEdit?: (category: Category) => void;
   depth: number;
 }) {
   // Find children of this category
@@ -142,6 +183,7 @@ function CategoryTreeNode({
       children={children}
       selectedCategory={selectedCategory}
       onCategorySelect={onCategorySelect}
+      onCategoryEdit={onCategoryEdit}
       depth={depth}
     />
   );
@@ -151,6 +193,7 @@ export function CategoryTree({
   categories,
   selectedCategory,
   onCategorySelect,
+  onCategoryEdit,
   className
 }: CategoryTreeProps) {
   if (categories.length === 0) {
@@ -183,6 +226,7 @@ export function CategoryTree({
           categories={categories}
           selectedCategory={selectedCategory}
           onCategorySelect={onCategorySelect}
+          onCategoryEdit={onCategoryEdit}
           depth={0}
         />
       ))}

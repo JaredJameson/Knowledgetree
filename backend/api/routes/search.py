@@ -22,6 +22,7 @@ from schemas.search import (
 from api.dependencies import get_current_active_user
 from services.search_service import SearchService
 from services.explainability_service import explainability_service
+from services.activity_tracker import ActivityTracker
 
 router = APIRouter(prefix="/search", tags=["Search"])
 logger = logging.getLogger(__name__)
@@ -106,6 +107,17 @@ async def search_documents(
             f"query='{search_request.query[:50]}', "
             f"results={len(search_results)}, "
             f"time={execution_time:.2f}ms"
+        )
+
+        # Track activity event
+        activity_tracker = ActivityTracker(db)
+        await activity_tracker.record_search(
+            user_id=current_user.id,
+            project_id=search_request.project_id,
+            query=search_request.query,
+            results_count=len(search_results),
+            search_type="semantic",
+            response_time_ms=int(execution_time)
         )
 
         return SearchResponse(

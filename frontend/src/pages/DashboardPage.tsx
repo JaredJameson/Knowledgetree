@@ -11,10 +11,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useTranslation } from 'react-i18next';
-import { FolderOpen, FileText, Search, MessageSquare, Loader2, CreditCard, Crown, Globe } from 'lucide-react';
-import { projectsApi, chatApi, subscriptionsApi } from '@/lib/api';
-import type { Project } from '@/types/api';
+import { FolderOpen, FileText, Search, MessageSquare, Loader2, CreditCard, Crown, Globe, BarChart3 } from 'lucide-react';
+import { projectsApi, chatApi, subscriptionsApi, analyticsApi } from '@/lib/api';
+import type { Project, DailyMetric } from '@/types/api';
 import type { SubscriptionDetails } from '@/types/subscription';
+import { TrendChart } from '@/components/analytics/TrendChart';
+import { ActivityFeed } from '@/components/analytics/ActivityFeed';
+import { QualityScoreCard } from '@/components/analytics/QualityScoreCard';
+import { UsageCard } from '@/components/dashboard/UsageCard';
+import { UpgradePrompt } from '@/components/subscription/UpgradePrompt';
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -27,9 +32,15 @@ export function DashboardPage() {
     documents: 0,
     conversations: 0,
   });
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Analytics data
+  const [metricsData, setMetricsData] = useState<DailyMetric[]>([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
 
   // Fetch dashboard statistics and subscription
   useEffect(() => {
@@ -44,14 +55,20 @@ export function DashboardPage() {
           subscriptionsApi.getMySubscription().catch(() => null),
         ]);
 
-        const projects: Project[] = projectsResponse.data.projects;
-        const projectCount = projects.length;
+        const projectsList: Project[] = projectsResponse.data.projects;
+        const projectCount = projectsList.length;
+
+        // Store projects list and set selected project (first by default)
+        setProjects(projectsList);
+        if (projectsList.length > 0 && !selectedProjectId) {
+          setSelectedProjectId(projectsList[0].id);
+        }
 
         // Sum all documents from all projects
-        const documentCount = projects.reduce((sum, project) => sum + (project.document_count || 0), 0);
+        const documentCount = projectsList.reduce((sum, project) => sum + (project.document_count || 0), 0);
 
         // Fetch conversation counts for each project (parallel)
-        const conversationPromises = projects.map(project =>
+        const conversationPromises = projectsList.map(project =>
           chatApi.listConversations(project.id, 1, 1)
             .then(res => res.data.total)
             .catch(() => 0) // If project has no conversations, return 0
@@ -80,6 +97,26 @@ export function DashboardPage() {
 
     fetchDashboardData();
   }, []);
+
+  // Fetch analytics metrics when project changes
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      if (!selectedProjectId) return;
+
+      try {
+        setMetricsLoading(true);
+        const response = await analyticsApi.getMetrics(selectedProjectId, 30);
+        setMetricsData(response.data.metrics);
+      } catch (err) {
+        console.error('Failed to fetch metrics:', err);
+        // Don't set error state, just fail silently for analytics
+      } finally {
+        setMetricsLoading(false);
+      }
+    };
+
+    fetchMetrics();
+  }, [selectedProjectId]);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
@@ -118,6 +155,9 @@ export function DashboardPage() {
               {t('dashboard.subtitle', 'Manage your knowledge base with AI and RAG system')}
             </p>
           </div>
+
+          {/* Upgrade Prompt */}
+          <UpgradePrompt />
 
           {/* Quick Stats */}
           {error && (
@@ -214,6 +254,79 @@ export function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Usage Card */}
+          <UsageCard />
+
+          {/* Analytics Section */}
+          {selectedProjectId && projects.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    <CardTitle>Analityka Projektu</CardTitle>
+                  </div>
+                  {/* Project Selector - show if multiple projects */}
+                  {projects.length > 1 && (
+                    <select
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(Number(e.target.value))}
+                      className="px-3 py-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm"
+                    >
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <CardDescription>
+                  Aktywność i wskaźniki jakości dla projektu: {projects.find(p => p.id === selectedProjectId)?.name}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column - Trend Chart (2/3 width on large screens) */}
+                  <div className="lg:col-span-2 space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4 text-neutral-900 dark:text-neutral-50">
+                        Trendy Aktywności (30 dni)
+                      </h3>
+                      {metricsLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
+                        </div>
+                      ) : metricsData.length > 0 ? (
+                        <TrendChart data={metricsData} height={300} />
+                      ) : (
+                        <div className="flex items-center justify-center py-12 text-neutral-500 dark:text-neutral-400">
+                          Brak danych do wyświetlenia
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column - Quality Score and Activity Feed (1/3 width on large screens) */}
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4 text-neutral-900 dark:text-neutral-50">
+                        Wskaźnik Jakości
+                      </h3>
+                      <QualityScoreCard projectId={selectedProjectId} days={7} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4 text-neutral-900 dark:text-neutral-50">
+                        Ostatnia Aktywność
+                      </h3>
+                      <ActivityFeed projectId={selectedProjectId} maxHeight="500px" />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Subscription & Usage */}
           {subscription && (

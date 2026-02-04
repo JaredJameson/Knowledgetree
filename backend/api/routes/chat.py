@@ -32,6 +32,7 @@ from services.rag_service import RAGService
 from services.command_parser import command_parser
 from services.artifact_generator import artifact_generator
 from services.usage_service import usage_service
+from services.activity_tracker import ActivityTracker
 from services.crawler_orchestrator import CrawlerOrchestrator, ScrapeResult
 from models.artifact import Artifact, ArtifactType
 from anthropic import Anthropic
@@ -303,6 +304,17 @@ async def chat(
         logger.info(
             f"Chat completed for user {current_user.id}: "
             f"conversation={conversation.id}, tokens={tokens_used}, time={processing_time:.2f}ms"
+        )
+
+        # Track activity event
+        activity_tracker = ActivityTracker(db)
+        await activity_tracker.record_chat_message(
+            user_id=current_user.id,
+            project_id=request.project_id,
+            conversation_id=conversation.id,
+            message_id=assistant_message.id,
+            tokens_used=tokens_used,
+            response_time_ms=int(processing_time)
         )
 
         return ChatResponse(

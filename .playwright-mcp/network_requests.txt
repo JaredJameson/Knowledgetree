@@ -1,0 +1,11 @@
+[GET] http://localhost:8765/api/v1/analytics/activity/66?limit=20&offset=0 => [200] OK
+[GET] http://localhost:8765/api/v1/analytics/activity/66?limit=20&offset=0
+[GET] http://localhost:8765/api/v1/auth/me => [200] OK
+[GET] http://localhost:8765/api/v1/auth/me => [200] OK
+[GET] http://localhost:8765/api/v1/documents/87 => [200] OK
+[GET] http://localhost:8765/api/v1/documents/87 => [200] OK
+[GET] http://localhost:8765/api/v1/categories?project_id=66&page=1&page_size=1000 => [307] Temporary Redirect
+[GET] http://localhost:8765/api/v1/categories?project_id=66&page=1&page_size=1000 => [307] Temporary Redirect
+[GET] http://localhost:8765/api/v1/categories/?project_id=66&page=1&page_size=1000 => [200] OK
+[GET] http://localhost:8765/api/v1/categories/?project_id=66&page=1&page_size=1000 => [200] OK
+[GET] http://localhost:3555/api/v1/categories/654 => [200] OK
