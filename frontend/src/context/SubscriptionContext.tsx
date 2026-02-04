@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { SubscriptionDetails, SubscriptionPlan } from '../types/subscription';
 import api from '../lib/api';
+import { useAuth } from './AuthContext';
 
 interface UsageMetric {
   used: number;
@@ -38,6 +39,7 @@ interface SubscriptionProviderProps {
 }
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [usage, setUsage] = useState<UsageLimits | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,8 +76,16 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (isAuthenticated) {
+      fetchData();
+    } else {
+      // User not authenticated - set loading to false
+      setLoading(false);
+      setSubscription(null);
+      setUsage(null);
+      setError(null);
+    }
+  }, [isAuthenticated]);
 
   const isLimitReached = (metric: keyof Pick<UsageLimits, 'messages' | 'documents' | 'storage' | 'projects'>): boolean => {
     if (!usage) return false;
