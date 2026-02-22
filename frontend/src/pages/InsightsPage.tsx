@@ -651,7 +651,7 @@ export default function InsightsPage() {
                                 labelStyle={{ color: 'var(--foreground)' }}
                               />
                               <Bar dataKey="documents" name="Dokumenty" radius={[8, 8, 0, 0]}>
-                                {projectInsights.top_categories.map((entry, index) => (
+                                {projectInsights.top_categories.map((_entry, index) => (
                                   <Cell
                                     key={`cell-${index}`}
                                     fill={`hsl(${(index * 360) / projectInsights.top_categories.length}, 70%, 50%)`}

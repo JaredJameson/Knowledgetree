@@ -101,3 +101,14 @@ class UserWithTokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
+
+class ChangePasswordRequest(BaseModel):
+    """Password change request"""
+    current_password: str = Field(..., description="Current password")
+    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+
+
+class DeleteAccountRequest(BaseModel):
+    """Account deletion request"""
+    password: str = Field(..., description="Current password for confirmation")

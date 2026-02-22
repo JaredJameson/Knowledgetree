@@ -234,42 +234,47 @@ class SearchService:
             logger.warning("⚠️ BM25 service not initialized - returning empty results")
             return [], 0.0
 
-        # Perform BM25 search (already async)
+        # Perform BM25 search (over-fetch to compensate for project filtering)
         bm25_results = await self.bm25_service.search(
             query=query,
-            top_k=limit,
+            top_k=limit * 3,
             min_score=min_score
         )
 
-        # Filter by project_id (BM25 returns all chunks, need to filter by project)
-        # Get document IDs for this project
-        doc_ids_result = await db.execute(
-            select(Document.id)
+        # Get document IDs and metadata for this project (single query)
+        doc_info_result = await db.execute(
+            select(Document.id, Document.title, Document.filename, Document.created_at)
             .where(Document.project_id == project_id)
         )
-        project_doc_ids = {row[0] for row in doc_ids_result.fetchall()}
+        doc_info_map = {
+            row[0]: {"title": row[1], "filename": row[2], "created_at": row[3]}
+            for row in doc_info_result.fetchall()
+        }
+        project_doc_ids = set(doc_info_map.keys())
 
-        # Filter results to only include chunks from project documents
+        # Filter results to only include chunks from this project
         filtered_results = []
         for result in bm25_results:
-            # BM25 service returns chunk data, need to check if document_id is in project
-            # Note: BM25 service might return results from ALL projects
-            # For now, we'll include all results and let caller filter if needed
-            # TODO: Add project_id filtering in BM25 service initialization
+            if result["document_id"] not in project_doc_ids:
+                continue
 
-            # Format result to match dense search format
+            doc_info = doc_info_map[result["document_id"]]
+
             filtered_results.append({
                 "chunk_id": result["id"],
                 "document_id": result["document_id"],
-                "document_title": result["title"],
-                "document_filename": result.get("document_filename", ""),
+                "document_title": doc_info["title"] or result.get("title"),
+                "document_filename": doc_info["filename"] or "",
                 "chunk_text": result["content"],
                 "chunk_index": result.get("chunk_index", 0),
-                "similarity_score": result["score"],  # BM25 score (normalized later)
-                "chunk_metadata": None,  # TODO: Add metadata from BM25 service
-                "document_created_at": None,  # TODO: Add timestamp from BM25 service
-                "source": "sparse"  # Mark as sparse result
+                "similarity_score": result["score"],
+                "chunk_metadata": result.get("chunk_metadata"),
+                "document_created_at": doc_info["created_at"],
+                "source": "sparse"
             })
+
+            if len(filtered_results) >= limit:
+                break
 
         execution_time = (time.time() - start_time) * 1000  # Convert to ms
         logger.info(

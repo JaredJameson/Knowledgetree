@@ -460,21 +460,37 @@ async def update_category(
                     detail="New parent category not found"
                 )
 
-            # Prevent circular reference
+            # Prevent circular reference (direct and indirect)
             if update_data.parent_id == category_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Category cannot be its own parent"
                 )
 
-            # TODO: Add check for circular reference in ancestors
-            # For now, just update
-            category.parent_id = update_data.parent_id
+            # Walk ancestor chain to detect indirect cycles (max depth 10)
+            current_ancestor_id = update_data.parent_id
+            visited = {category_id}
+            for _ in range(10):
+                if current_ancestor_id is None:
+                    break
+                if current_ancestor_id in visited:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Circular reference detected in category hierarchy"
+                    )
+                visited.add(current_ancestor_id)
+                ancestor_result = await db.execute(
+                    select(Category.parent_id).where(
+                        Category.id == current_ancestor_id,
+                        Category.project_id == category.project_id
+                    )
+                )
+                ancestor_row = ancestor_result.first()
+                if ancestor_row is None:
+                    break
+                current_ancestor_id = ancestor_row[0]
 
-            logger.warning(
-                f"Changed parent of category {category_id} to {update_data.parent_id}. "
-                f"Depth recalculation NOT automatic - verify tree structure."
-            )
+            category.parent_id = update_data.parent_id
 
     await db.commit()
     await db.refresh(category)

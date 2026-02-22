@@ -119,6 +119,78 @@ class PDFProcessor:
             logger.error(f"Docling extraction failed: {str(e)}")
             raise
 
+    def extract_text_pdfplumber(self, pdf_path: Path) -> tuple[str, int]:
+        """
+        Extract text from PDF using pdfplumber (good for tables and forms)
+
+        Args:
+            pdf_path: Path to PDF file
+
+        Returns:
+            Tuple of (extracted_text, page_count)
+        """
+        try:
+            import pdfplumber
+        except ImportError:
+            raise RuntimeError("pdfplumber not installed. Install with: pip install pdfplumber")
+
+        try:
+            text_content = []
+            with pdfplumber.open(pdf_path) as pdf:
+                page_count = len(pdf.pages)
+                for page_num, page in enumerate(pdf.pages):
+                    text = page.extract_text() or ""
+                    text_content.append(f"--- Page {page_num + 1} ---\n{text}")
+
+            full_text = "\n\n".join(text_content)
+            logger.info(f"Extracted {len(full_text)} characters from {page_count} pages using pdfplumber")
+            return full_text, page_count
+
+        except Exception as e:
+            logger.error(f"pdfplumber extraction failed: {str(e)}")
+            raise
+
+    def extract_text_pytesseract(self, pdf_path: Path) -> tuple[str, int]:
+        """
+        Extract text from scanned PDF using OCR (pytesseract)
+
+        Args:
+            pdf_path: Path to PDF file
+
+        Returns:
+            Tuple of (extracted_text, page_count)
+        """
+        try:
+            import pytesseract
+            from PIL import Image
+        except ImportError:
+            raise RuntimeError(
+                "pytesseract or Pillow not installed. "
+                "Install with: pip install pytesseract Pillow. "
+                "Also requires system package: apt-get install tesseract-ocr tesseract-ocr-pol"
+            )
+
+        try:
+            doc = fitz.open(pdf_path)
+            page_count = len(doc)
+            text_content = []
+
+            for page_num in range(page_count):
+                page = doc[page_num]
+                pix = page.get_pixmap(dpi=300)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                text = pytesseract.image_to_string(img, lang="pol+eng")
+                text_content.append(f"--- Page {page_num + 1} ---\n{text}")
+
+            doc.close()
+            full_text = "\n\n".join(text_content)
+            logger.info(f"Extracted {len(full_text)} characters from {page_count} pages using pytesseract OCR")
+            return full_text, page_count
+
+        except Exception as e:
+            logger.error(f"pytesseract OCR extraction failed: {str(e)}")
+            raise
+
     def process_pdf(
         self,
         pdf_path: Path,
@@ -232,14 +304,16 @@ class PDFProcessor:
                     return text, page_count
 
                 elif tool == ExtractionTool.PDFPLUMBER:
-                    # TODO: Implement pdfplumber extraction
-                    logger.warning("pdfplumber not yet implemented, skipping")
-                    continue
+                    text, page_count = self.extract_text_pdfplumber(pdf_path)
+                    metadata["extraction_tool"] = "pdfplumber"
+                    logger.info("✅ Successfully extracted with pdfplumber")
+                    return text, page_count
 
                 elif tool == ExtractionTool.PYTESSERACT:
-                    # TODO: Implement OCR extraction
-                    logger.warning("pytesseract not yet implemented, skipping")
-                    continue
+                    text, page_count = self.extract_text_pytesseract(pdf_path)
+                    metadata["extraction_tool"] = "pytesseract"
+                    logger.info("✅ Successfully extracted with pytesseract (OCR)")
+                    return text, page_count
 
             except Exception as e:
                 last_error = e

@@ -157,6 +157,10 @@ class Settings(BaseSettings):
     ENABLE_WEB_CRAWLING: bool = True  # Enable web crawling with Firecrawl + Serper
     ENABLE_AI_INSIGHTS: bool = True   # Enable AI-powered document and project insights
     ENABLE_AGENTIC_WORKFLOWS: bool = True  # Enable AI agent workflows for complex tasks
+    ENABLE_ACTIVITY_TRACKING: bool = True  # Phase 1: Dashboard & Analytics
+    ENABLE_CONTENT_WORKBENCH: bool = True  # Phase 2: Content editor and versioning
+    ENABLE_AI_REWRITING: bool = True  # Phase 2: AI content rewriting operations
+    ENABLE_KNOWLEDGE_GRAPH: bool = True  # Phase 3: Knowledge graph visualization
 
     # ========================================================================
     # Demo Mode (Testing without subscription limits)

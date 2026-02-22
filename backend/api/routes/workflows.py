@@ -38,7 +38,6 @@ from schemas.workflow import (
     WorkflowResults,
 )
 from services.langgraph_orchestrator import get_langgraph_orchestrator
-from services.workflow_tasks import execute_workflow
 import json
 
 
@@ -209,22 +208,49 @@ async def get_workflow_status(
     # Get results if completed
     results = None
     if workflow.status == WorkflowStatus.COMPLETED:
-        # Count various metrics
-        urls_result = await db.execute(
+        # Count total URLs discovered and approved (scraped)
+        urls_total_result = await db.execute(
+            select(func.count(URLCandidate.id)).where(
+                URLCandidate.workflow_id == workflow_id
+            )
+        )
+        urls_discovered = urls_total_result.scalar() or 0
+
+        urls_approved_result = await db.execute(
             select(func.count(URLCandidate.id)).where(
                 URLCandidate.workflow_id == workflow_id,
                 URLCandidate.user_approval == "approved"
             )
         )
-        urls_scraped = urls_result.scalar() or 0
-        
-        # TODO: Get actual knowledge points and relationships when implemented
+        urls_scraped = urls_approved_result.scalar() or 0
+
+        # Extract metrics from last checkpoint state_snapshot
+        knowledge_points = 0
+        relationships = 0
+        category_tree_id = None
+
+        checkpoint_result = await db.execute(
+            select(WorkflowState.state_snapshot)
+            .where(WorkflowState.workflow_id == workflow_id)
+            .order_by(WorkflowState.created_at.desc())
+            .limit(1)
+        )
+        checkpoint_snapshot = checkpoint_result.scalar_one_or_none()
+        if checkpoint_snapshot:
+            try:
+                snapshot = json.loads(checkpoint_snapshot)
+                knowledge_points = len(snapshot.get("knowledge_points", []))
+                relationships = len(snapshot.get("entity_relationships", []))
+                category_tree_id = snapshot.get("category_tree_id")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         results = WorkflowResults(
-            urls_discovered=0,  # Will be populated from URLCandidates
+            urls_discovered=urls_discovered,
             urls_scraped=urls_scraped,
-            knowledge_points=0,
-            relationships=0,
-            knowledge_tree_id=None
+            knowledge_points=knowledge_points,
+            relationships=relationships,
+            knowledge_tree_id=category_tree_id
         )
     
     return WorkflowStatusResponse(
@@ -615,27 +641,62 @@ async def get_workflow_results(
             detail="Workflow is not completed yet"
         )
     
-    # Get URL candidates
-    urls_result = await db.execute(
+    # Count total URLs discovered and approved (scraped)
+    urls_total_result = await db.execute(
+        select(func.count(URLCandidate.id)).where(
+            URLCandidate.workflow_id == workflow_id
+        )
+    )
+    urls_discovered = urls_total_result.scalar() or 0
+
+    urls_approved_result = await db.execute(
         select(func.count(URLCandidate.id)).where(
             URLCandidate.workflow_id == workflow_id,
             URLCandidate.user_approval == "approved"
         )
     )
-    urls_scraped = urls_result.scalar() or 0
-    
-    # TODO: Get actual results from knowledge tree when implemented
-    
+    urls_scraped = urls_approved_result.scalar() or 0
+
+    # Extract metrics from last checkpoint state_snapshot
+    knowledge_points = 0
+    relationships = 0
+    category_tree_id = None
+
+    checkpoint_result = await db.execute(
+        select(WorkflowState.state_snapshot)
+        .where(WorkflowState.workflow_id == workflow_id)
+        .order_by(WorkflowState.created_at.desc())
+        .limit(1)
+    )
+    checkpoint_snapshot = checkpoint_result.scalar_one_or_none()
+    if checkpoint_snapshot:
+        try:
+            snapshot = json.loads(checkpoint_snapshot)
+            knowledge_points = len(snapshot.get("knowledge_points", []))
+            relationships = len(snapshot.get("entity_relationships", []))
+            category_tree_id = snapshot.get("category_tree_id")
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Extract summary from execution_log
+    summary = "Workflow completed successfully"
+    if workflow.execution_log:
+        try:
+            log = json.loads(workflow.execution_log)
+            summary = log.get("summary", summary)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
         "workflow_id": workflow_id,
         "status": "completed",
         "results": {
-            "urls_discovered": 0,
+            "urls_discovered": urls_discovered,
             "urls_scraped": urls_scraped,
-            "knowledge_points": 0,
-            "relationships": 0,
-            "knowledge_tree_id": None,
-            "summary": "Workflow completed successfully",
+            "knowledge_points": knowledge_points,
+            "relationships": relationships,
+            "knowledge_tree_id": category_tree_id,
+            "summary": summary,
             "duration_minutes": workflow.actual_duration_minutes
         },
         "created_at": workflow.created_at,

@@ -45,9 +45,8 @@ celery_app.conf.update(
 
     # Task routing
     task_routes={
-        "services.workflow_tasks.execute_workflow": {"queue": "workflows"},
-        "services.workflow_tasks.execute_research": {"queue": "research"},
-        "services.workflow_tasks.execute_scraping": {"queue": "scraping"},
+        "services.workflow_tasks.check_approval_timeout": {"queue": "workflows"},
+        "services.workflow_tasks.cleanup_old_workflows": {"queue": "workflows"},
         "services.document_tasks.process_document_task": {"queue": "documents"},
         "services.document_tasks.process_agentic_crawl_task": {"queue": "workflows"},
     },

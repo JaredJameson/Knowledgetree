@@ -34,38 +34,79 @@ async def search_web(
     _context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Search the web for URLs related to a query
-    
+    Search the web for URLs related to a query.
+
+    Uses Serper.dev (preferred) or Google Custom Search API with
+    graceful fallback to empty results if no API key is configured.
+
     Args:
         query: Search query
         num_results: Number of results (1-50)
         date_range: Date range filter (day, week, month, year, any)
         language: Search language code
         _context: Workflow context (auto-injected)
-    
+
     Returns:
         Dict with discovered URLs
     """
-    # TODO: Implement Google Custom Search API integration
-    # For now, return mock results
-    
-    mock_urls = [
-        {
-            "url": f"https://example.com/page{i}",
-            "title": f"Example Page {i} - {query}",
-            "snippet": f"This page contains information about {query}",
-            "relevance_score": 0.8 - (i * 0.02),
-            "date": "2024-01-01"
-        }
-        for i in range(min(num_results, 10))
-    ]
-    
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Try Serper.dev first (preferred, cheaper)
+    try:
+        from services.serper_search import SerperSearchService
+        serper = SerperSearchService()
+        if serper.api_key:
+            lang_code = f"lang_{language}" if not language.startswith("lang_") else language
+            response = await serper.search(
+                query=query,
+                num_results=min(num_results, 50),
+                language=lang_code
+            )
+            return {
+                "urls": [
+                    {
+                        "url": r.link,
+                        "title": r.title,
+                        "snippet": r.snippet,
+                        "relevance_score": round(1.0 - (r.position * 0.02), 2),
+                        "date": None
+                    }
+                    for r in response.results
+                ],
+                "total": response.total_results,
+                "query": query,
+                "source": "serper_search",
+                "date_range": date_range
+            }
+    except Exception as e:
+        logger.warning(f"Serper search failed, trying Google CSE: {e}")
+
+    # Fallback to Google Custom Search
+    try:
+        from services.google_search import GoogleSearchService
+        google = GoogleSearchService()
+        if google.is_configured:
+            results = await google.search(query=query, num_results=num_results)
+            return {
+                "urls": results,
+                "total": len(results),
+                "query": query,
+                "source": "google_search_api",
+                "date_range": date_range
+            }
+    except Exception as e:
+        logger.warning(f"Google CSE search failed: {e}")
+
+    # No search API configured
+    logger.warning("No search API configured (SERPER_API_KEY or GOOGLE_CSE_API_KEY)")
     return {
-        "urls": mock_urls,
-        "total": len(mock_urls),
+        "urls": [],
+        "total": 0,
         "query": query,
-        "source": "google_search_api",
-        "date_range": date_range
+        "source": "none",
+        "date_range": date_range,
+        "warning": "No search API configured. Set SERPER_API_KEY or GOOGLE_CSE_API_KEY."
     }
 
 

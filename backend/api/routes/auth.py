@@ -24,6 +24,8 @@ from schemas.auth import (
     TokenRefreshRequest,
     UserResponse,
     UserWithTokenResponse,
+    ChangePasswordRequest,
+    DeleteAccountRequest,
 )
 from api.dependencies import get_current_user
 
@@ -255,3 +257,50 @@ async def get_current_user_info(
         created_at=current_user.created_at.isoformat(),
         updated_at=current_user.updated_at.isoformat(),
     )
+
+
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password(
+    request: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Change current user's password
+
+    Requires the current password for verification and a new password (min 8 chars).
+    """
+    if not verify_password(request.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect current password"
+        )
+
+    current_user.password_hash = get_password_hash(request.new_password)
+    await db.commit()
+
+    return {"message": "Password changed successfully"}
+
+
+@router.delete("/delete-account", status_code=status.HTTP_200_OK)
+async def delete_account(
+    request: DeleteAccountRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Permanently delete current user account and all associated data
+
+    Requires password confirmation. All projects, documents, conversations,
+    and other user data will be permanently deleted via CASCADE.
+    """
+    if not verify_password(request.password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect password"
+        )
+
+    await db.delete(current_user)
+    await db.commit()
+
+    return {"message": "Account deleted successfully"}
